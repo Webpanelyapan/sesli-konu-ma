@@ -9,19 +9,34 @@ const io = new Server(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  maxHttpBufferSize: 5e6 // 5MB dosya/resim transfer desteği
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Oda verileri: { [roomId]: { password: "...", users: { [socketId]: { username, isMuted, isDeafened, color } } } }
+// Oda verileri: 
+// rooms.get(roomId) = { 
+//   password, 
+//   createdAt, 
+//   hostId, 
+//   isLocked: false,
+//   users: Map(socketId -> { id, username, color, isMuted, isDeafened, isSharingScreen, isAdmin })
+// }
 const rooms = new Map();
 
 io.on('connection', (socket) => {
   let currentRoom = null;
   let currentUser = null;
+
+  // Ping ölçümü
+  socket.on('ping-measure', (timestamp, callback) => {
+    if (typeof callback === 'function') {
+      callback(timestamp);
+    }
+  });
 
   // Odaya katılma isteği
   socket.on('join-room', ({ roomId, password, username, color }, callback) => {
@@ -37,34 +52,44 @@ io.on('connection', (socket) => {
       return callback({ success: false, message: 'Kullanıcı adı boş olamaz!' });
     }
 
-    // Oda var mı kontrol et
     let room = rooms.get(cleanRoomId);
 
     if (room) {
-      // Oda var, şifre doğru mu?
+      // Oda kilitli mi?
+      if (room.isLocked) {
+        return callback({ success: false, message: 'Bu oda yönetici tarafından kilitlendi!' });
+      }
+
+      // Şifre kontrolü
       if (room.password !== inputPassword) {
         return callback({ success: false, message: 'Hatalı oda şifresi!' });
       }
     } else {
-      // Oda yok, yeni oda oluştur
+      // Yeni oda oluştur (İlk giren Host / Yönetici olur)
       room = {
         password: inputPassword,
         createdAt: Date.now(),
+        hostId: socket.id,
+        isLocked: false,
         users: new Map()
       };
       rooms.set(cleanRoomId, room);
     }
 
-    // Kullanıcıyı odaya ekle
-    currentRoom = cleanRoomId;
+    const isHost = (room.hostId === socket.id) || (room.users.size === 0);
+    if (isHost) room.hostId = socket.id;
+
     currentUser = {
       id: socket.id,
       username: cleanUsername,
       color: color || '#6366f1',
       isMuted: false,
-      isDeafened: false
+      isDeafened: false,
+      isSharingScreen: false,
+      isAdmin: isHost
     };
 
+    currentRoom = cleanRoomId;
     socket.join(cleanRoomId);
     room.users.set(socket.id, currentUser);
 
@@ -80,10 +105,12 @@ io.on('connection', (socket) => {
       success: true,
       roomId: cleanRoomId,
       currentUser,
-      existingUsers
+      existingUsers,
+      isHost,
+      isLocked: room.isLocked
     });
 
-    // Odadaki diğer kullanıcılara yeni birinin katıldığını bildir (WebRTC sinyalleşmesi için)
+    // Diğer kullanıcılara yeni birinin katıldığını bildir
     socket.to(cleanRoomId).emit('user-joined', {
       user: currentUser
     });
@@ -92,32 +119,35 @@ io.on('connection', (socket) => {
     io.to(cleanRoomId).emit('chat-message', {
       id: 'sys-' + Date.now(),
       system: true,
-      text: `${cleanUsername} odaya katıldı.`,
+      text: `${cleanUsername} ${isHost ? '(Oda Yöneticisi) ' : ''}odaya katıldı.`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
   });
 
   // WebRTC Sinyalleşme: Teklif (Offer)
-  socket.on('webrtc-offer', ({ targetId, offer }) => {
+  socket.on('webrtc-offer', ({ targetId, offer, type }) => {
     io.to(targetId).emit('webrtc-offer', {
       senderId: socket.id,
-      offer
+      offer,
+      type: type || 'audio'
     });
   });
 
   // WebRTC Sinyalleşme: Cevap (Answer)
-  socket.on('webrtc-answer', ({ targetId, answer }) => {
+  socket.on('webrtc-answer', ({ targetId, answer, type }) => {
     io.to(targetId).emit('webrtc-answer', {
       senderId: socket.id,
-      answer
+      answer,
+      type: type || 'audio'
     });
   });
 
   // WebRTC Sinyalleşme: ICE Candidate
-  socket.on('webrtc-ice-candidate', ({ targetId, candidate }) => {
+  socket.on('webrtc-ice-candidate', ({ targetId, candidate, type }) => {
     io.to(targetId).emit('webrtc-ice-candidate', {
       senderId: socket.id,
-      candidate
+      candidate,
+      type: type || 'audio'
     });
   });
 
@@ -138,7 +168,22 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Konuşma durumu (Speaking state for visual indicator)
+  // Ekran paylaşımı durumu
+  socket.on('screen-share-state', ({ isSharing }) => {
+    if (!currentRoom || !currentUser) return;
+    const room = rooms.get(currentRoom);
+    if (!room) return;
+
+    currentUser.isSharingScreen = !!isSharing;
+    room.users.set(socket.id, currentUser);
+
+    io.to(currentRoom).emit('user-screen-updated', {
+      userId: socket.id,
+      isSharing: currentUser.isSharingScreen
+    });
+  });
+
+  // Konuşma durumu (Speaking state)
   socket.on('speaking-state', ({ isSpeaking }) => {
     if (!currentRoom) return;
     socket.to(currentRoom).emit('user-speaking-state', {
@@ -148,10 +193,10 @@ io.on('connection', (socket) => {
   });
 
   // Yazılı Chat Mesajı
-  socket.on('send-chat', ({ text }) => {
+  socket.on('send-chat', ({ text, fileData, fileName, fileType }) => {
     if (!currentRoom || !currentUser) return;
     const cleanText = (text || '').trim();
-    if (!cleanText) return;
+    if (!cleanText && !fileData) return;
 
     io.to(currentRoom).emit('chat-message', {
       id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
@@ -159,8 +204,56 @@ io.on('connection', (socket) => {
       username: currentUser.username,
       color: currentUser.color,
       text: cleanText,
+      fileData: fileData || null,
+      fileName: fileName || null,
+      fileType: fileType || null,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
+  });
+
+  // YÖNETİCİ EYLEMLERİ: Kullanıcıyı Odadan Atma (Kick)
+  socket.on('admin-kick-user', ({ targetId }) => {
+    if (!currentRoom || !currentUser || !currentUser.isAdmin) return;
+    const room = rooms.get(currentRoom);
+    if (!room) return;
+
+    const targetUser = room.users.get(targetId);
+    if (!targetUser) return;
+
+    io.to(targetId).emit('kicked-from-room', { reason: 'Oda yöneticisi tarafından odadan çıkarıldınız.' });
+    
+    // Odadakilere bildir
+    io.to(currentRoom).emit('chat-message', {
+      id: 'sys-' + Date.now(),
+      system: true,
+      text: `${targetUser.username} oda yöneticisi tarafından atıldı.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+  });
+
+  // YÖNETİCİ EYLEMLERİ: Birini Sessize Alma (Mute)
+  socket.on('admin-mute-user', ({ targetId }) => {
+    if (!currentRoom || !currentUser || !currentUser.isAdmin) return;
+    io.to(targetId).emit('forced-mute');
+  });
+
+  // YÖNETİCİ EYLEMLERİ: Odayı Kilitleme / Açma (Lock)
+  socket.on('admin-toggle-lock', (callback) => {
+    if (!currentRoom || !currentUser || !currentUser.isAdmin) return;
+    const room = rooms.get(currentRoom);
+    if (!room) return;
+
+    room.isLocked = !room.isLocked;
+    io.to(currentRoom).emit('room-lock-changed', { isLocked: room.isLocked });
+
+    io.to(currentRoom).emit('chat-message', {
+      id: 'sys-' + Date.now(),
+      system: true,
+      text: `Oda ${room.isLocked ? 'kilitlendi (yeni girişler kapatıldı)' : 'kilidi açıldı'}.`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+
+    if (typeof callback === 'function') callback({ isLocked: room.isLocked });
   });
 
   // Ayrılma / Bağlantı kopması
@@ -180,6 +273,21 @@ io.on('connection', (socket) => {
           text: `${currentUser.username} odadan ayrıldı.`,
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         });
+
+        // Eğer ayrılan kişi host ise, görevi sıradaki kişiye devret
+        if (room.hostId === socket.id && room.users.size > 0) {
+          const nextHostEntry = room.users.entries().next().value;
+          if (nextHostEntry) {
+            const [nextHostId, nextHostUser] = nextHostEntry;
+            room.hostId = nextHostId;
+            nextHostUser.isAdmin = true;
+            io.to(nextHostId).emit('promoted-to-host');
+            io.to(currentRoom).emit('new-host-assigned', {
+              hostId: nextHostId,
+              username: nextHostUser.username
+            });
+          }
+        }
 
         // Odada kimse kalmadıysa odayı temizle
         if (room.users.size === 0) {
@@ -203,7 +311,7 @@ io.on('connection', (socket) => {
 
 server.listen(PORT, () => {
   console.log(`===============================================`);
-  console.log(`🚀 Sesli Sohbet Sunucusu Başlatıldı!`);
-  console.log(`🌐 Yerel adres: http://localhost:${PORT}`);
+  console.log(`🚀 Güçlendirilmiş Sesli Sohbet Sunucusu Aktif!`);
+  console.log(`🌐 Adres: http://localhost:${PORT}`);
   console.log(`===============================================`);
 });

@@ -947,3 +947,257 @@ body {
     padding: 24px;
   }
 }
+
+/* ========================================================
+   GÜÇLENDİRİLMİŞ ALTYAPI & YENİ ÖZELLİK STİLLERİ
+   ======================================================== */
+
+/* Ping / Gecikme Rozeti */
+.ping-badge {
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: 700;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Ekran Paylaşımı & Admin Butonları */
+.screen-btn {
+  background: rgba(168, 85, 247, 0.15);
+  color: #c084fc;
+  border-color: rgba(168, 85, 247, 0.3);
+}
+.screen-btn:hover {
+  background: rgba(168, 85, 247, 0.25);
+  color: #e9d5ff;
+}
+.screen-btn.active {
+  background: #a855f7;
+  color: white;
+  box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
+}
+
+.admin-btn {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.admin-btn:hover {
+  background: rgba(245, 158, 11, 0.25);
+}
+
+/* Canlı Ekran Paylaşımı Alanı */
+.screen-share-container {
+  margin: 16px 20px 0;
+  background: #000;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--bg-card-border);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: #111827;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.screen-user-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.live-tag {
+  background: #ef4444;
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 800;
+  animation: pulse-dot 1.5s infinite;
+}
+
+.screen-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.screen-action-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.screen-video-wrapper {
+  position: relative;
+  width: 100%;
+  max-height: 480px;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.screen-video-wrapper video {
+  width: 100%;
+  height: 100%;
+  max-height: 480px;
+  object-fit: contain;
+}
+
+/* Bas-Konuş (PTT) Butonu */
+.ptt-btn {
+  background: rgba(255, 255, 255, 0.05);
+}
+.ptt-btn.active {
+  background: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.5);
+}
+
+/* Host Rozeti */
+.host-badge {
+  font-size: 0.68rem;
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  font-weight: 800;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.self-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Kullanıcı Başına Ses Ayarı (Per-User Volume) */
+.user-volume-box {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  width: 100%;
+  max-width: 150px;
+}
+
+.user-volume-box span {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.user-volume-box input[type="range"] {
+  flex: 1;
+  height: 3px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+/* Yönetici Butonu (Kick) */
+.card-admin-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.kick-user-btn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  padding: 3px 6px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.kick-user-btn:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* Chat Dosya & Görsel Butonu */
+.attach-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.attach-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
+}
+.attach-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Chat Görsel Önizleme */
+.chat-image-preview {
+  margin-top: 6px;
+  max-width: 260px;
+  max-height: 200px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  display: block;
+}
+.chat-image-preview:hover {
+  transform: scale(1.02);
+}
+
+/* Resim Modal (Lightbox) */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal-content {
+  max-width: 90vw;
+  max-height: 85vh;
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.8);
+}
+
+.modal-close {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: white;
+  font-size: 35px;
+  font-weight: bold;
+  cursor: pointer;
+}

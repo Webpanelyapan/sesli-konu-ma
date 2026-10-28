@@ -102,13 +102,30 @@
       <div class="room-identity">
         <div class="room-badge">
           <span class="live-dot"></span>
-          <span class="lock-icon">🔒</span>
+          <span class="lock-icon" id="room-lock-icon">🔒</span>
           <h2 id="current-room-title">Oda</h2>
         </div>
         <span class="user-count-badge" id="user-count">1 Kişi</span>
+        <div class="ping-badge" id="ping-badge" title="Gecikme süresi">📶 <span>-- ms</span></div>
       </div>
 
       <div class="topbar-actions">
+        <!-- Ekran Paylaşımı Butonu -->
+        <button id="btn-share-screen" class="action-btn screen-btn" title="Ekranını veya bir pencereyi yayınla">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span id="screen-btn-text">Ekran Paylaş</span>
+        </button>
+
+        <!-- Yönetici: Odayı Kilitle Butonu -->
+        <button id="btn-lock-room" class="action-btn admin-btn hidden" title="Odaya yeni katılımları kilitle/aç">
+          <span id="lock-btn-text">🔒 Odayı Kilitle</span>
+        </button>
+
+        <!-- Davet Linki -->
         <button id="btn-copy-link" class="action-btn link-btn" title="Davet linkini kopyala">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
@@ -117,6 +134,7 @@
           <span>Linki Kopyala</span>
         </button>
 
+        <!-- Ayrıl -->
         <button id="btn-leave-room" class="action-btn leave-btn" title="Odadan ayrıl">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -128,7 +146,7 @@
       </div>
     </header>
 
-    <!-- Ana Çalışma Alanı (Sol: Ses / Katılımcılar, Sağ: Chat) -->
+    <!-- Ana Çalışma Alanı (Sol: Ses / Katılımcılar / Ekran, Sağ: Chat) -->
     <div class="room-body">
       <!-- SOL: SESLİ KANAL VE KULLANICILAR -->
       <section class="voice-panel">
@@ -140,7 +158,21 @@
             </svg>
             <h3>Sesli Sohbet Katılımcıları</h3>
           </div>
-          <span class="status-indicator online">Canlı Bağlantı</span>
+          <span class="status-indicator online">Canlı WebRTC + TURN</span>
+        </div>
+
+        <!-- Canlı Ekran Paylaşımı Alanı -->
+        <div id="screen-share-view" class="screen-share-container hidden">
+          <div class="screen-header">
+            <div class="screen-user-badge">
+              <span class="live-tag">CANLI YAYIN</span>
+              <span id="screen-sharer-name">Kullanıcı Ekranı</span>
+            </div>
+            <button id="btn-fullscreen-screen" class="screen-action-btn" title="Tam Ekran">⛶</button>
+          </div>
+          <div class="screen-video-wrapper">
+            <video id="screen-video" autoplay playsinline></video>
+          </div>
         </div>
 
         <!-- Katılımcılar Listesi -->
@@ -153,7 +185,10 @@
           <div class="self-info">
             <div class="self-avatar" id="self-avatar-preview">Y</div>
             <div class="self-details">
-              <span class="self-name" id="self-name-label">Kullanıcı</span>
+              <div class="self-name-row">
+                <span class="self-name" id="self-name-label">Kullanıcı</span>
+                <span class="host-badge hidden" id="self-host-badge">👑 Host</span>
+              </div>
               <div class="mic-level-wrapper" title="Mikrofon Ses Seviyesi">
                 <span class="mic-meter-bar" id="self-mic-meter"></span>
                 <span class="mic-threshold-mark" id="mic-threshold-mark"></span>
@@ -175,6 +210,12 @@
           </div>
 
           <div class="dock-controls">
+            <!-- Bas-Konuş Modu Butonu -->
+            <button id="btn-toggle-ptt" class="control-btn ptt-btn" title="Bas-Konuş Modunu Aç/Kapat (Boşluk Tuşu)">
+              <span class="ctrl-icon">⌨️</span>
+              <span class="ctrl-label" id="ptt-label">Bas-Konuş: Kapalı</span>
+            </button>
+
             <!-- Mikrofon Butonu -->
             <button id="btn-toggle-mic" class="control-btn active" title="Mikrofonu Kapat / Aç">
               <span class="ctrl-icon" id="mic-icon">🎙️</span>
@@ -219,9 +260,17 @@
           <button type="button" class="emoji-chip" data-emoji="👏">👏</button>
         </div>
 
-        <!-- Mesaj Gönderme Formu -->
+        <!-- Mesaj Gönderme Formu (Resim/Dosya Ekleme Destekli) -->
         <form id="chat-form" class="chat-input-area">
-          <input type="text" id="chat-input" placeholder="Bir mesaj yazın..." maxlength="500" autocomplete="off">
+          <label for="chat-file-input" class="attach-btn" title="Resim veya Görsel Gönder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+            </svg>
+          </label>
+          <input type="file" id="chat-file-input" accept="image/*" style="display: none;">
+
+          <input type="text" id="chat-input" placeholder="Mesaj yazın veya resim yapıştırın (Ctrl+V)..." maxlength="500" autocomplete="off">
+
           <button type="submit" id="btn-send-chat" class="send-btn" title="Gönder">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -231,6 +280,12 @@
         </form>
       </section>
     </div>
+  </div>
+
+  <!-- Resim Büyütme Modal (Lightbox) -->
+  <div id="image-modal" class="image-modal hidden">
+    <span class="modal-close" id="modal-close">&times;</span>
+    <img id="modal-img" class="modal-content" src="" alt="Önizleme">
   </div>
 
   <!-- Ses elementleri için gizli container (WebRTC gelen ses akışları) -->
