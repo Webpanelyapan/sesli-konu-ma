@@ -154,9 +154,23 @@
             <div class="self-avatar" id="self-avatar-preview">Y</div>
             <div class="self-details">
               <span class="self-name" id="self-name-label">Kullanıcı</span>
-              <div class="mic-level-wrapper">
+              <div class="mic-level-wrapper" title="Mikrofon Ses Seviyesi">
                 <span class="mic-meter-bar" id="self-mic-meter"></span>
+                <span class="mic-threshold-mark" id="mic-threshold-mark"></span>
               </div>
+            </div>
+          </div>
+
+          <!-- Gürültü / Klavye Filtresi Kontrolü -->
+          <div class="noise-filter-box">
+            <button type="button" id="btn-toggle-filter" class="filter-toggle active" title="Klavye ve arka plan seslerini engelle">
+              <span class="filter-icon">🛡️</span>
+              <span class="filter-label">Klavye Filtresi</span>
+            </button>
+            <div class="filter-slider-wrap" title="Hassasiyet Eşiği: Klavye sesleri geliyorsa sağa çekin">
+              <span class="slider-text">Eşik:</span>
+              <input type="range" id="filter-sensitivity" min="5" max="45" value="20" step="1">
+              <span id="filter-val" class="slider-num">20</span>
             </div>
           </div>
 

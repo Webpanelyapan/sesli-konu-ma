@@ -31,6 +31,11 @@ const btnToggleDeaf = document.getElementById('btn-toggle-deaf');
 const micIcon = document.getElementById('mic-icon');
 const deafIcon = document.getElementById('deaf-icon');
 
+const btnToggleFilter = document.getElementById('btn-toggle-filter');
+const filterSensitivity = document.getElementById('filter-sensitivity');
+const filterVal = document.getElementById('filter-val');
+const micThresholdMark = document.getElementById('mic-threshold-mark');
+
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
@@ -40,9 +45,17 @@ const toastEl = document.getElementById('toast');
 let selectedColor = '#6366f1';
 let currentRoom = null;
 let currentUser = null;
+let rawAudioStream = null;
 let localStream = null;
 let isMuted = false;
 let isDeafened = false;
+
+// Gürültü ve Klavye Filtre Değişkenleri
+let isFilterActive = true;
+let sensitivityThreshold = 20; // Klavye sesini kesen eşik (0 - 60)
+let lastVoiceDetectedTime = 0;
+let gateGainNode = null;
+let biquadFilter = null;
 
 // WebRTC Eşler Haritası: userId -> { pc, audioElement, analyser }
 const peers = new Map();
@@ -144,21 +157,21 @@ function playSound(type = 'message') {
 }
 
 // ==========================================
-// MİKROFON VE SES DÜZEYİ TAKİBİ
+// MİKROFON, KLAVYE VE GÜRÜLTÜ FİLTRELEME
 // ==========================================
 async function initLocalMicrophone() {
   try {
-    localStream = await navigator.mediaDevices.getUserMedia({
+    // autoGainControl: false -> Klavye seslerinin konuşulmadığında otomatik yükseltilmesini engeller
+    rawAudioStream = await navigator.mediaDevices.getUserMedia({
       audio: {
         echoCancellation: true,
         noiseSuppression: true,
-        autoGainControl: true
+        autoGainControl: false
       },
       video: false
     });
   } catch (err) {
     console.warn('Mikrofon erişimi reddedildi veya bulunamadı, sessiz modda devam ediliyor:', err);
-    // Mikrofon yoksa sessiz boş stream oluştur
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const osc = audioContext.createOscillator();
     const dst = osc.connect(audioContext.createMediaStreamDestination());
@@ -167,13 +180,14 @@ async function initLocalMicrophone() {
     localStream.getAudioTracks().forEach(t => t.enabled = false);
     isMuted = true;
     showToast('Mikrofon bulunamadı veya izin verilmedi. Dinleyici modundasınız.', 'error');
+    return;
   }
 
-  // Ses seviyesini görselleştirme ve konuşma tespiti
-  setupAudioMeter();
+  // Web Audio filtreleme ve Akıllı Gürültü Kapısı (Noise Gate) kurulumu
+  setupAudioProcessing();
 }
 
-function setupAudioMeter() {
+function setupAudioProcessing() {
   try {
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -182,44 +196,115 @@ function setupAudioMeter() {
       audioContext.resume();
     }
 
-    const source = audioContext.createMediaStreamSource(localStream);
+    const source = audioContext.createMediaStreamSource(rawAudioStream);
+
+    // 1. Yüksek geçiren filtre (High-Pass): 100Hz altındaki mekanik masa ve klavye gövde titreşimlerini keser
+    biquadFilter = audioContext.createBiquadFilter();
+    biquadFilter.type = 'highpass';
+    biquadFilter.frequency.value = 110;
+
+    // 2. Akıllı Gürültü Kapısı (Noise Gate): Konuşulmadığında klavye tıkırtısını tamamen sıfırlar
+    gateGainNode = audioContext.createGain();
+    gateGainNode.gain.setValueAtTime(0, audioContext.currentTime);
+
+    // 3. WebRTC için işlenmiş temiz ses çıkışı
+    const destination = audioContext.createMediaStreamDestination();
+
+    source.connect(biquadFilter);
+    biquadFilter.connect(gateGainNode);
+    gateGainNode.connect(destination);
+
+    // Ham mikrofondan ses seviyesini ve konuşmayı analiz etmek için
     micAnalyser = audioContext.createAnalyser();
     micAnalyser.fftSize = 256;
     source.connect(micAnalyser);
 
-    const dataArray = new Uint8Array(micAnalyser.frequencyBinCount);
+    // WebRTC'ye gidecek nihai ses akışı
+    localStream = destination.stream;
 
-    function checkVolume() {
-      if (!micAnalyser) return;
-      micAnalyser.getByteFrequencyData(dataArray);
+    setupVolumeMonitor();
+    updateThresholdMarker();
+  } catch (e) {
+    console.warn('Audio processing kurulum hatası, ham akış kullanılıyor:', e);
+    localStream = rawAudioStream;
+  }
+}
 
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        sum += dataArray[i];
-      }
-      const avg = sum / dataArray.length;
-      const volumePercent = Math.min(100, (avg / 60) * 100);
+function setupVolumeMonitor() {
+  const dataArray = new Uint8Array(micAnalyser.frequencyBinCount);
 
-      // Gösterge çubuğu
-      if (selfMicMeter) {
-        selfMicMeter.style.width = isMuted ? '0%' : `${volumePercent}%`;
-      }
+  function checkVolume() {
+    if (!micAnalyser) return;
+    micAnalyser.getByteFrequencyData(dataArray);
 
-      // Konuşuyor tespiti
-      const speaking = !isMuted && avg > 12;
-      if (speaking !== isCurrentlySpeaking) {
-        isCurrentlySpeaking = speaking;
-        updateSelfSpeakingCard(isCurrentlySpeaking);
-        socket.emit('speaking-state', { isSpeaking: isCurrentlySpeaking });
-      }
+    let sum = 0;
+    for (let i = 0; i < dataArray.length; i++) {
+      sum += dataArray[i];
+    }
+    const avg = sum / dataArray.length;
+    const volumePercent = Math.min(100, (avg / 50) * 100);
 
-      micAnimFrame = requestAnimationFrame(checkVolume);
+    // Görsel ses seviyesi çubuğu
+    if (selfMicMeter) {
+      selfMicMeter.style.width = isMuted ? '0%' : `${volumePercent}%`;
     }
 
-    checkVolume();
-  } catch (e) {
-    console.warn('Web Audio meter hatası:', e);
+    const now = performance.now();
+
+    // Gürültü Kapısı (Noise Gate) Mantığı:
+    if (isFilterActive && !isMuted) {
+      if (avg >= sensitivityThreshold) {
+        lastVoiceDetectedTime = now;
+        // İnsan sesi eşiği aştı: Kapıyı hemen aç (12ms)
+        gateGainNode.gain.setTargetAtTime(1.0, audioContext.currentTime, 0.012);
+      } else if (now - lastVoiceDetectedTime > 260) {
+        // Konuşma durdu ve klavye seviyesine indi: Sesi tamamen kes (35ms)
+        gateGainNode.gain.setTargetAtTime(0.0, audioContext.currentTime, 0.035);
+      }
+    } else {
+      // Filtre kapalıysa veya mute ise
+      const target = isMuted ? 0.0 : 1.0;
+      if (gateGainNode) {
+        gateGainNode.gain.setTargetAtTime(target, audioContext.currentTime, 0.02);
+      }
+    }
+
+    // Konuşuyor parlaması (Discord tarzı yeşil halka)
+    const speaking = !isMuted && (isFilterActive ? (now - lastVoiceDetectedTime <= 260 && avg >= sensitivityThreshold) : avg > 12);
+    if (speaking !== isCurrentlySpeaking) {
+      isCurrentlySpeaking = speaking;
+      updateSelfSpeakingCard(isCurrentlySpeaking);
+      socket.emit('speaking-state', { isSpeaking: isCurrentlySpeaking });
+    }
+
+    micAnimFrame = requestAnimationFrame(checkVolume);
   }
+
+  checkVolume();
+}
+
+// Filtre ve Hassasiyet Ayar Olayları
+function updateThresholdMarker() {
+  if (micThresholdMark) {
+    const markPercent = Math.min(100, (sensitivityThreshold / 50) * 100);
+    micThresholdMark.style.left = `${markPercent}%`;
+  }
+}
+
+if (filterSensitivity) {
+  filterSensitivity.addEventListener('input', (e) => {
+    sensitivityThreshold = parseInt(e.target.value, 10);
+    if (filterVal) filterVal.textContent = sensitivityThreshold;
+    updateThresholdMarker();
+  });
+}
+
+if (btnToggleFilter) {
+  btnToggleFilter.addEventListener('click', () => {
+    isFilterActive = !isFilterActive;
+    btnToggleFilter.classList.toggle('active', isFilterActive);
+    showToast(isFilterActive ? 'Klavye & Gürültü Filtresi Açık' : 'Gürültü Filtresi Kapalı');
+  });
 }
 
 // ==========================================
@@ -539,12 +624,21 @@ function updateUserCount() {
 // MİKROFON & SAĞIRLAŞTIRMA (DEAFEN) KONTROLLERİ
 // ==========================================
 btnToggleMic.addEventListener('click', () => {
-  if (!localStream) return;
   isMuted = !isMuted;
 
-  localStream.getAudioTracks().forEach(track => {
-    track.enabled = !isMuted;
-  });
+  if (rawAudioStream) {
+    rawAudioStream.getAudioTracks().forEach(track => {
+      track.enabled = !isMuted;
+    });
+  }
+  if (localStream) {
+    localStream.getAudioTracks().forEach(track => {
+      track.enabled = !isMuted;
+    });
+  }
+  if (gateGainNode && audioContext) {
+    gateGainNode.gain.setValueAtTime(isMuted ? 0 : 1, audioContext.currentTime);
+  }
 
   if (isMuted) {
     btnToggleMic.classList.add('muted');
@@ -618,10 +712,18 @@ btnLeaveRoom.addEventListener('click', () => {
 function leaveCurrentRoom() {
   socket.emit('leave-room');
 
-  // Mikrofon akışını durdur
+  // Mikrofon akışlarını durdur
+  if (rawAudioStream) {
+    rawAudioStream.getTracks().forEach(track => track.stop());
+    rawAudioStream = null;
+  }
   if (localStream) {
     localStream.getTracks().forEach(track => track.stop());
     localStream = null;
+  }
+  if (micAnimFrame) {
+    cancelAnimationFrame(micAnimFrame);
+    micAnimFrame = null;
   }
 
   // Eş bağlantılarını kapat

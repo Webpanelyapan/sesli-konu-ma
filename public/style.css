@@ -614,10 +614,11 @@ body {
 }
 
 .mic-level-wrapper {
-  width: 100px;
-  height: 5px;
+  width: 110px;
+  height: 6px;
   background: var(--bg-element);
   border-radius: var(--radius-full);
+  position: relative;
   overflow: hidden;
 }
 
@@ -627,7 +628,77 @@ body {
   width: 0%;
   background: var(--success);
   border-radius: var(--radius-full);
-  transition: width 0.06s ease;
+  transition: width 0.05s ease;
+}
+
+.mic-threshold-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #f59e0b;
+  left: 33%;
+  z-index: 2;
+  box-shadow: 0 0 4px #f59e0b;
+}
+
+/* Gürültü ve Klavye Filtre Kutusu */
+.noise-filter-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--bg-card-border);
+}
+
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--bg-card-border);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.filter-toggle.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.35);
+  color: #34d399;
+}
+
+.filter-toggle:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.filter-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.filter-slider-wrap input[type="range"] {
+  width: 70px;
+  height: 4px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.slider-num {
+  font-family: monospace;
+  font-weight: 700;
+  color: #38bdf8;
+  min-width: 18px;
 }
 
 .dock-controls {
