@@ -51,25 +51,43 @@ let isMuted = false;
 let isDeafened = false;
 
 // Gürültü ve Klavye Filtre Değişkenleri
-let isFilterActive = true;
-let sensitivityThreshold = 20; // Klavye sesini kesen eşik (0 - 60)
+let isFilterActive = false; // Başlangıçta güvenli açık kalsın, kullanıcı dilerse tek tıkla açar
+let sensitivityThreshold = 14; // Konuşmayı kesmeyecek hassas eşik
 let lastVoiceDetectedTime = 0;
 let gateGainNode = null;
 let biquadFilter = null;
 
-// WebRTC Eşler Haritası: userId -> { pc, audioElement, analyser }
+// WebRTC Eşler Haritası: userId -> { pc, candidateQueue: [] }
 const peers = new Map();
 // Odadaki kullanıcı bilgileri: userId -> userObject
 const roomUsers = new Map();
 
-// WebRTC STUN Sunucu Yapılandırması
+// WebRTC STUN ve TURN Sunucu Yapılandırması (Farklı evler/ağlar için TURN şarttır!)
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' }
-  ]
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    // Metered Ücretsiz TURN Röle Sunucuları (CGNAT / Farklı Evler & Mobil İnternet Engellerini Aşar)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  ],
+  iceCandidatePoolSize: 10
 };
 
 // Web Audio API (Ses algılama & Konuşma göstergesi)
@@ -203,9 +221,9 @@ function setupAudioProcessing() {
     biquadFilter.type = 'highpass';
     biquadFilter.frequency.value = 110;
 
-    // 2. Akıllı Gürültü Kapısı (Noise Gate): Konuşulmadığında klavye tıkırtısını tamamen sıfırlar
+    // 2. Akıllı Gürültü Kapısı: Başlangıçta 1.0 (Açık) başlar, ses asla kilitlenmez
     gateGainNode = audioContext.createGain();
-    gateGainNode.gain.setValueAtTime(0, audioContext.currentTime);
+    gateGainNode.gain.setValueAtTime(1.0, audioContext.currentTime);
 
     // 3. WebRTC için işlenmiş temiz ses çıkışı
     const destination = audioContext.createMediaStreamDestination();
@@ -255,14 +273,13 @@ function setupVolumeMonitor() {
     if (isFilterActive && !isMuted) {
       if (avg >= sensitivityThreshold) {
         lastVoiceDetectedTime = now;
-        // İnsan sesi eşiği aştı: Kapıyı hemen aç (12ms)
-        gateGainNode.gain.setTargetAtTime(1.0, audioContext.currentTime, 0.012);
-      } else if (now - lastVoiceDetectedTime > 260) {
-        // Konuşma durdu ve klavye seviyesine indi: Sesi tamamen kes (35ms)
-        gateGainNode.gain.setTargetAtTime(0.0, audioContext.currentTime, 0.035);
+        gateGainNode.gain.setTargetAtTime(1.0, audioContext.currentTime, 0.015);
+      } else if (now - lastVoiceDetectedTime > 300) {
+        // Konuşma bittiğinde klavye sesini hafiflet
+        gateGainNode.gain.setTargetAtTime(0.08, audioContext.currentTime, 0.04);
       }
     } else {
-      // Filtre kapalıysa veya mute ise
+      // Filtre kapalıysa veya sessizdeyse tam açık ilet
       const target = isMuted ? 0.0 : 1.0;
       if (gateGainNode) {
         gateGainNode.gain.setTargetAtTime(target, audioContext.currentTime, 0.02);
@@ -270,7 +287,7 @@ function setupVolumeMonitor() {
     }
 
     // Konuşuyor parlaması (Discord tarzı yeşil halka)
-    const speaking = !isMuted && (isFilterActive ? (now - lastVoiceDetectedTime <= 260 && avg >= sensitivityThreshold) : avg > 12);
+    const speaking = !isMuted && (isFilterActive ? (now - lastVoiceDetectedTime <= 300 && avg >= sensitivityThreshold) : avg > 10);
     if (speaking !== isCurrentlySpeaking) {
       isCurrentlySpeaking = speaking;
       updateSelfSpeakingCard(isCurrentlySpeaking);
@@ -394,11 +411,14 @@ function createPeerConnection(targetUserId) {
   }
 
   const pc = new RTCPeerConnection(rtcConfig);
+  const peerRecord = { pc, candidateQueue: [] };
+  peers.set(targetUserId, peerRecord);
 
   // Yerel mikrofon izlerini ekle
-  if (localStream) {
-    localStream.getTracks().forEach(track => {
-      pc.addTrack(track, localStream);
+  const streamToSend = localStream || rawAudioStream;
+  if (streamToSend) {
+    streamToSend.getAudioTracks().forEach(track => {
+      pc.addTrack(track, streamToSend);
     });
   }
 
@@ -414,24 +434,49 @@ function createPeerConnection(targetUserId) {
 
   // Karşı tarafın sesi geldiğinde
   pc.ontrack = (event) => {
+    console.log(`[WebRTC] Gelen ses akışı bağlandı (${targetUserId})`);
     let audioEl = document.getElementById(`audio-${targetUserId}`);
     if (!audioEl) {
       audioEl = document.createElement('audio');
       audioEl.id = `audio-${targetUserId}`;
       audioEl.autoplay = true;
+      audioEl.playsInline = true;
       remoteAudios.appendChild(audioEl);
     }
     audioEl.srcObject = event.streams[0];
-    audioEl.muted = isDeafened; // Eğer sağırlaştırılmışsak sesi kıs
+    audioEl.muted = isDeafened;
+
+    // Tarayıcı otomatik ses engelleme kilidini aç
+    const playPromise = audioEl.play();
+    if (playPromise !== undefined) {
+      playPromise.catch((err) => {
+        console.warn('Otomatik ses çalma kısıtlaması, tıklama ile açılacak:', err);
+        const unlock = () => {
+          audioEl.play().catch(() => {});
+          window.removeEventListener('click', unlock);
+          window.removeEventListener('keydown', unlock);
+        };
+        window.addEventListener('click', unlock);
+        window.addEventListener('keydown', unlock);
+      });
+    }
+  };
+
+  pc.oniceconnectionstatechange = () => {
+    console.log(`[WebRTC] ICE Durumu (${targetUserId}):`, pc.iceConnectionState);
+    if (pc.iceConnectionState === 'failed') {
+      console.warn('ICE bağlantısı başarısız oldu, yeniden başlatılıyor...');
+      if (pc.restartIce) pc.restartIce();
+    }
   };
 
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+    console.log(`[WebRTC] Bağlantı Durumu (${targetUserId}):`, pc.connectionState);
+    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
       cleanupPeer(targetUserId);
     }
   };
 
-  peers.set(targetUserId, { pc });
   return pc;
 }
 
@@ -458,7 +503,18 @@ async function initiateWebRTCConnection(targetUserId) {
 socket.on('webrtc-offer', async ({ senderId, offer }) => {
   try {
     const pc = createPeerConnection(senderId);
+    const peerData = peers.get(senderId);
+
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
+
+    // Bekleyen ICE adaylarını kuyruktan işle
+    if (peerData && peerData.candidateQueue && peerData.candidateQueue.length > 0) {
+      for (const cand of peerData.candidateQueue) {
+        await pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+      }
+      peerData.candidateQueue = [];
+    }
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
@@ -477,6 +533,14 @@ socket.on('webrtc-answer', async ({ senderId, answer }) => {
     const peerData = peers.get(senderId);
     if (peerData && peerData.pc) {
       await peerData.pc.setRemoteDescription(new RTCSessionDescription(answer));
+
+      // Bekleyen ICE adaylarını kuyruktan işle
+      if (peerData.candidateQueue && peerData.candidateQueue.length > 0) {
+        for (const cand of peerData.candidateQueue) {
+          await peerData.pc.addIceCandidate(new RTCIceCandidate(cand)).catch(() => {});
+        }
+        peerData.candidateQueue = [];
+      }
     }
   } catch (err) {
     console.error('WebRTC Answer karşılama hatası:', err);
@@ -488,7 +552,11 @@ socket.on('webrtc-ice-candidate', async ({ senderId, candidate }) => {
   try {
     const peerData = peers.get(senderId);
     if (peerData && peerData.pc) {
-      await peerData.pc.addIceCandidate(new RTCIceCandidate(candidate));
+      if (peerData.pc.remoteDescription && peerData.pc.remoteDescription.type) {
+        await peerData.pc.addIceCandidate(new RTCIceCandidate(candidate)).catch(() => {});
+      } else {
+        peerData.candidateQueue.push(candidate);
+      }
     }
   } catch (err) {
     console.error('ICE Candidate hatası:', err);
