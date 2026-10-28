@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesli & Yazılı Sohbet Odası</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Bildirim kutusu (Toast) -->
+  <div id="toast" class="toast"></div>
+
+  <!-- GİRİŞ EKRANI -->
+  <main id="join-screen" class="join-container">
+    <div class="join-card">
+      <div class="join-header">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+            <line x1="12" y1="19" x2="12" y2="23"></line>
+            <line x1="8" y1="23" x2="16" y2="23"></line>
+          </svg>
+        </div>
+        <h1>Sesli Sohbet</h1>
+        <p class="subtitle">Şifreli odaya katıl veya yeni oda başlat</p>
+      </div>
+
+      <form id="join-form" class="join-form">
+        <div class="form-group">
+          <label for="room-input">
+            <span class="label-icon">🚪</span>
+            Oda Adı
+          </label>
+          <div class="input-wrapper">
+            <input type="text" id="room-input" placeholder="Örn: muhabbet, oyun-odasi" required autocomplete="off">
+          </div>
+          <span class="hint" id="room-hint">Bağlantı linkinde oda adı varsa otomatik doldurulur.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="password-input">
+            <span class="label-icon">🔒</span>
+            Oda Şifresi
+          </label>
+          <div class="input-wrapper password-box">
+            <input type="password" id="password-input" placeholder="Oda için bir şifre girin" required autocomplete="current-password">
+            <button type="button" id="toggle-pwd-btn" class="icon-btn-inline" title="Şifreyi Göster/Gizle">
+              👁️
+            </button>
+          </div>
+          <span class="hint">Yeni odaya bu şifre atanır; var olan odaya bu şifreyle girilir.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="username-input">
+            <span class="label-icon">👤</span>
+            Kullanıcı Adın
+          </label>
+          <div class="input-wrapper">
+            <input type="text" id="username-input" placeholder="Sohbetteki adınız..." required maxlength="25" autocomplete="name">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <span class="label-icon">🎨</span>
+            Avatar Rengi
+          </label>
+          <div class="color-picker-grid" id="color-picker">
+            <button type="button" class="color-swatch active" data-color="#6366f1" style="--c: #6366f1"></button>
+            <button type="button" class="color-swatch" data-color="#8b5cf6" style="--c: #8b5cf6"></button>
+            <button type="button" class="color-swatch" data-color="#ec4899" style="--c: #ec4899"></button>
+            <button type="button" class="color-swatch" data-color="#f43f5e" style="--c: #f43f5e"></button>
+            <button type="button" class="color-swatch" data-color="#f59e0b" style="--c: #f59e0b"></button>
+            <button type="button" class="color-swatch" data-color="#10b981" style="--c: #10b981"></button>
+            <button type="button" class="color-swatch" data-color="#06b6d4" style="--c: #06b6d4"></button>
+            <button type="button" class="color-swatch" data-color="#3b82f6" style="--c: #3b82f6"></button>
+          </div>
+        </div>
+
+        <div id="join-error" class="error-banner hidden"></div>
+
+        <button type="submit" id="btn-enter" class="btn-primary">
+          <span>Odaya Katıl & Mikrofonu Başlat</span>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="arrow-icon">
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+            <polyline points="12 5 19 12 12 19"></polyline>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </main>
+
+  <!-- ODA EKRANI (SESLİ + YAZILI) -->
+  <div id="room-screen" class="room-container hidden">
+    <!-- Üst Başlık ve Hızlı Eylemler -->
+    <header class="room-topbar">
+      <div class="room-identity">
+        <div class="room-badge">
+          <span class="live-dot"></span>
+          <span class="lock-icon">🔒</span>
+          <h2 id="current-room-title">Oda</h2>
+        </div>
+        <span class="user-count-badge" id="user-count">1 Kişi</span>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="btn-copy-link" class="action-btn link-btn" title="Davet linkini kopyala">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+          <span>Linki Kopyala</span>
+        </button>
+
+        <button id="btn-leave-room" class="action-btn leave-btn" title="Odadan ayrıl">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+          <span>Ayrıl</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Ana Çalışma Alanı (Sol: Ses / Katılımcılar, Sağ: Chat) -->
+    <div class="room-body">
+      <!-- SOL: SESLİ KANAL VE KULLANICILAR -->
+      <section class="voice-panel">
+        <div class="panel-header">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+            <h3>Sesli Sohbet Katılımcıları</h3>
+          </div>
+          <span class="status-indicator online">Canlı Bağlantı</span>
+        </div>
+
+        <!-- Katılımcılar Listesi -->
+        <div class="members-grid" id="members-list">
+          <!-- Dinamik olarak JS ile eklenecek -->
+        </div>
+
+        <!-- Sesli Konuşma Alt Çubuğu (Kullanıcı Kontrolleri) -->
+        <div class="voice-dock">
+          <div class="self-info">
+            <div class="self-avatar" id="self-avatar-preview">Y</div>
+            <div class="self-details">
+              <span class="self-name" id="self-name-label">Kullanıcı</span>
+              <div class="mic-level-wrapper">
+                <span class="mic-meter-bar" id="self-mic-meter"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="dock-controls">
+            <!-- Mikrofon Butonu -->
+            <button id="btn-toggle-mic" class="control-btn active" title="Mikrofonu Kapat / Aç">
+              <span class="ctrl-icon" id="mic-icon">🎙️</span>
+              <span class="ctrl-label">Mikrofon</span>
+            </button>
+
+            <!-- Kulaklık Butonu -->
+            <button id="btn-toggle-deaf" class="control-btn" title="Sesi Kapat / Aç">
+              <span class="ctrl-icon" id="deaf-icon">🎧</span>
+              <span class="ctrl-label">Kulaklık</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- SAĞ: YAZILI CHAT -->
+      <section class="chat-panel">
+        <div class="panel-header chat-header">
+          <div class="section-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <h3>Oda Sohbeti</h3>
+          </div>
+          <span class="chat-encryption-label">🔒 Şifreli ve Anlık</span>
+        </div>
+
+        <!-- Mesaj Akışı -->
+        <div class="chat-messages" id="chat-messages">
+          <!-- Dinamik mesajlar -->
+        </div>
+
+        <!-- Hızlı Emojiler -->
+        <div class="quick-emojis">
+          <button type="button" class="emoji-chip" data-emoji="👋">👋</button>
+          <button type="button" class="emoji-chip" data-emoji="👍">👍</button>
+          <button type="button" class="emoji-chip" data-emoji="😂">😂</button>
+          <button type="button" class="emoji-chip" data-emoji="🔥">🔥</button>
+          <button type="button" class="emoji-chip" data-emoji="❤️">❤️</button>
+          <button type="button" class="emoji-chip" data-emoji="🎉">🎉</button>
+          <button type="button" class="emoji-chip" data-emoji="🚀">🚀</button>
+          <button type="button" class="emoji-chip" data-emoji="👏">👏</button>
+        </div>
+
+        <!-- Mesaj Gönderme Formu -->
+        <form id="chat-form" class="chat-input-area">
+          <input type="text" id="chat-input" placeholder="Bir mesaj yazın..." maxlength="500" autocomplete="off">
+          <button type="submit" id="btn-send-chat" class="send-btn" title="Gönder">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+      </section>
+    </div>
+  </div>
+
+  <!-- Ses elementleri için gizli container (WebRTC gelen ses akışları) -->
+  <div id="remote-audios" style="display: none;"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
