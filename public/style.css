@@ -760,6 +760,55 @@ body {
   color: var(--text-muted);
 }
 
+/* Canlı Konuşan Gösterge Barı */
+.chat-speaker-banner {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.18) 0%, rgba(99, 102, 241, 0.12) 100%);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.25);
+  padding: 7px 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: fadeIn 0.2s ease;
+}
+
+.speaker-wave-icon {
+  font-size: 1rem;
+  animation: pulse-dot 1.2s infinite;
+}
+
+.speaker-live-text strong {
+  color: #f8fafc;
+}
+
+/* Kart Spotlight / Büyütme Modu */
+.member-card {
+  cursor: pointer;
+}
+
+.member-card.spotlight {
+  grid-column: 1 / -1 !important;
+  background: linear-gradient(145deg, rgba(30, 41, 59, 0.95), rgba(15, 23, 42, 0.98)) !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.45) !important;
+  padding: 22px !important;
+  transform: scale(1.01);
+  z-index: 10;
+}
+
+.member-card.spotlight .member-avatar {
+  width: 76px !important;
+  height: 76px !important;
+  font-size: 1.8rem !important;
+}
+
+.member-card.spotlight .member-video {
+  max-height: 380px !important;
+  border-radius: 14px;
+}
+
 .chat-messages {
   flex: 1;
   padding: 18px 20px;

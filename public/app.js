@@ -212,22 +212,64 @@ function playSound(type = 'message') {
     osc.connect(gain);
     gain.connect(ctx.destination);
 
+    const now = ctx.currentTime;
+
     if (type === 'message') {
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(587.33, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.12);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      osc.frequency.setValueAtTime(587.33, now);
+      osc.frequency.exponentialRampToValueAtTime(880, now + 0.12);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
       osc.start();
-      osc.stop(ctx.currentTime + 0.2);
+      osc.stop(now + 0.2);
     } else if (type === 'join') {
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(440, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(659.25, ctx.currentTime + 0.15);
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.15);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
       osc.start();
-      osc.stop(ctx.currentTime + 0.25);
+      osc.stop(now + 0.25);
+    } else if (type === 'leave') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(659.25, now);
+      osc.frequency.exponentialRampToValueAtTime(329.63, now + 0.2);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start();
+      osc.stop(now + 0.25);
+    } else if (type === 'mute') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(440, now);
+      osc.frequency.setValueAtTime(330, now + 0.08);
+      gain.gain.setValueAtTime(0.07, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc.start();
+      osc.stop(now + 0.16);
+    } else if (type === 'unmute') {
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(330, now);
+      osc.frequency.setValueAtTime(440, now + 0.08);
+      gain.gain.setValueAtTime(0.07, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      osc.start();
+      osc.stop(now + 0.16);
+    } else if (type === 'deafen') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(280, now);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.2);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+      osc.start();
+      osc.stop(now + 0.25);
+    } else if (type === 'undeafen') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(360, now + 0.18);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      osc.start();
+      osc.stop(now + 0.22);
     }
   } catch (err) {}
 }
@@ -627,6 +669,7 @@ function setMuteState(muted) {
   btnToggleMic.classList.toggle('muted', isMuted);
   micIcon.textContent = isMuted ? '🔇' : '🎙️';
   renderSelfCard();
+  playSound(isMuted ? 'mute' : 'unmute');
   socket.emit('audio-state-change', { isMuted, isDeafened });
 }
 
@@ -639,6 +682,7 @@ function toggleDeafen() {
   btnToggleDeaf.classList.toggle('muted', isDeafened);
   deafIcon.textContent = isDeafened ? '🔇' : '🎧';
   showToast(isDeafened ? 'Oda sesi kapatıldı (Sağırlaştırıldı).' : 'Oda sesi açıldı.');
+  playSound(isDeafened ? 'deafen' : 'undeafen');
   socket.emit('audio-state-change', { isMuted, isDeafened });
 }
 
@@ -881,6 +925,16 @@ function createPeerConnection(targetUserId) {
   return pc;
 }
 
+function optimizeOpusSdp(sdp) {
+  if (!sdp) return sdp;
+  return sdp.replace(/a=fmtp:(\d+)(.*)/g, (match, pt, params) => {
+    if (params.includes('minptime') || params.includes('useinbandfec') || sdp.includes(`a=rtpmap:${pt} opus`)) {
+      return `a=fmtp:${pt} minptime=10;useinbandfec=1;maxaveragebitrate=128000;stereo=1;sprop-stereo=1;cbr=1;usedtx=1`;
+    }
+    return match;
+  });
+}
+
 async function initiateWebRTCConnection(targetUserId) {
   try {
     const pc = createPeerConnection(targetUserId);
@@ -888,11 +942,15 @@ async function initiateWebRTCConnection(targetUserId) {
       offerToReceiveAudio: true,
       offerToReceiveVideo: true
     });
-    await pc.setLocalDescription(offer);
+    const modifiedOffer = new RTCSessionDescription({
+      type: offer.type,
+      sdp: optimizeOpusSdp(offer.sdp)
+    });
+    await pc.setLocalDescription(modifiedOffer);
 
     socket.emit('webrtc-offer', {
       targetId: targetUserId,
-      offer
+      offer: modifiedOffer
     });
   } catch (err) {
     console.error('WebRTC Offer hatası:', err);
@@ -914,11 +972,15 @@ socket.on('webrtc-offer', async ({ senderId, offer }) => {
     }
 
     const answer = await pc.createAnswer();
-    await pc.setLocalDescription(answer);
+    const modifiedAnswer = new RTCSessionDescription({
+      type: answer.type,
+      sdp: optimizeOpusSdp(answer.sdp)
+    });
+    await pc.setLocalDescription(modifiedAnswer);
 
     socket.emit('webrtc-answer', {
       targetId: senderId,
-      answer
+      answer: modifiedAnswer
     });
   } catch (err) {
     console.error('WebRTC Answer hatası:', err);
@@ -981,6 +1043,10 @@ socket.on('user-left', ({ userId, username }) => {
   removeUserFromRoom(userId);
   cleanupPeer(userId);
   updateUserCount();
+  playSound('leave');
+  if (username) {
+    showToast(`👋 ${username} odadan ayrıldı.`);
+  }
 });
 
 socket.on('user-audio-updated', ({ userId, isMuted: muted }) => {
@@ -1018,11 +1084,25 @@ socket.on('user-screen-updated', ({ userId, isSharing }) => {
   }
 });
 
+function updateActiveSpeakerBanner(name, isSpeaking) {
+  const banner = document.getElementById('chat-speaker-banner');
+  const nameEl = document.getElementById('chat-speaker-name');
+  if (!banner || !nameEl) return;
+  if (isSpeaking && name) {
+    nameEl.textContent = name;
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
 socket.on('user-speaking-state', ({ userId, isSpeaking }) => {
   const card = document.getElementById(`card-${userId}`);
   if (card) {
     card.classList.toggle('speaking', isSpeaking);
   }
+  const u = roomUsers.get(userId);
+  updateActiveSpeakerBanner(u ? u.username : '', isSpeaking);
 });
 
 socket.on('promoted-to-host', () => {
@@ -1108,6 +1188,16 @@ function renderSelfCard() {
     </div>
   `;
 
+  card.onclick = (e) => {
+    if (e.target.closest('.user-volume-box') || e.target.closest('.card-admin-actions') || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    const isSpotlight = card.classList.contains('spotlight');
+    document.querySelectorAll('.member-card.spotlight').forEach(c => c.classList.remove('spotlight'));
+    if (!isSpotlight) {
+      card.classList.add('spotlight');
+      showToast('Kullanıcı öne çıkarıldı. Küçültmek için tekrar tıklayın.');
+    }
+  };
+
   if (isCameraActive && localCameraStream) {
     const v = card.querySelector('.member-video');
     if (v) v.srcObject = localCameraStream;
@@ -1130,6 +1220,16 @@ function addUserToRoom(user) {
     card.className = 'member-card';
     membersList.appendChild(card);
   }
+
+  card.onclick = (e) => {
+    if (e.target.closest('.user-volume-box') || e.target.closest('.card-admin-actions') || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+    const isSpotlight = card.classList.contains('spotlight');
+    document.querySelectorAll('.member-card.spotlight').forEach(c => c.classList.remove('spotlight'));
+    if (!isSpotlight) {
+      card.classList.add('spotlight');
+      showToast(`${user.username} öne çıkarıldı. Küçültmek için tekrar tıklayın.`);
+    }
+  };
 
   const kickBtnHtml = isAdmin ? `
     <div class="card-admin-actions">
@@ -1520,6 +1620,47 @@ function escapeHtml(str) {
     }[m];
   });
 }
+
+// ========================================================
+// 13.5 KESİNTİSİZ OTOMATİK YENİDEN BAĞLANMA MOTORU
+// ========================================================
+let isReconnecting = false;
+
+socket.on('disconnect', (reason) => {
+  if (currentRoom) {
+    isReconnecting = true;
+    showToast('⚠️ Bağlantı kesildi, ağ bekleniyor...', 'error');
+  }
+});
+
+socket.on('connect', () => {
+  if (isReconnecting && currentRoom) {
+    showToast('🔄 Bağlantı sağlandı, odaya tekrar giriliyor...', 'normal');
+    const saved = sessionStorage.getItem('sesli_chat_session');
+    if (saved) {
+      try {
+        const d = JSON.parse(saved);
+        socket.emit('join-room', {
+          roomId: d.roomId,
+          password: d.password,
+          username: d.username,
+          color: d.color
+        }, (res) => {
+          if (res && res.success) {
+            showToast('✅ Odaya kesintisiz tekrar bağlandı!', 'success');
+            if (res.existingUsers) {
+              res.existingUsers.forEach(u => {
+                addUserToRoom(u);
+                initiateWebRTCConnection(u.id);
+              });
+            }
+          }
+        });
+      } catch (e) {}
+    }
+    isReconnecting = false;
+  }
+});
 
 // ========================================================
 // 14. MOBİL TAB GEÇİŞİ (SES / SOHBET)
