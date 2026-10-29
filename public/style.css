@@ -935,7 +935,7 @@ body {
 }
 
 /* ========================================================
-   MOBİL & TABLET RESPONSIVE TASARIM
+   GELİŞMİŞ MOBİL & TABLET ULTRA PREMIUM ARAYÜZ (V4 ULTRA)
    ======================================================== */
 
 /* Mobil alt menü çubuğu - masaüstünde gizli */
@@ -943,64 +943,150 @@ body {
   display: none;
 }
 
+/* Bildirim noktası animasyonu */
+@keyframes unreadPulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { transform: scale(1.2); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+@keyframes voiceGlowPulse {
+  0% { box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16, 185, 129, 0.4); }
+  50% { box-shadow: 0 0 0 4px #10b981, 0 0 22px rgba(16, 185, 129, 0.6); }
+  100% { box-shadow: 0 0 0 2px #10b981, 0 0 12px rgba(16, 185, 129, 0.4); }
+}
+
 @media (max-width: 768px) {
-  /* Oda kapsayıcısı ekrana tam sığsın */
+  /* Dokunmatik gecikmesini sıfırla */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Ana oda kapsayıcısı: tam ekran ve modern çerçevesiz akış */
   .room-container {
     height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    background: #090d16;
   }
 
-  /* Üst bar: mobilde taşmayan kompakt tasarım */
+  /* =====================
+     1. MOBİL ÜST BAR (GLASSMORPHISM)
+     ===================== */
   .room-topbar {
-    padding: 8px 12px;
-    flex-wrap: nowrap;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     gap: 8px;
+    z-index: 50;
   }
 
   .room-identity {
-    gap: 6px;
+    gap: 8px;
     min-width: 0;
     flex: 1;
+    display: flex;
+    align-items: center;
+  }
+
+  .room-badge {
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 5px 10px;
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
   }
 
   .room-identity h2 {
-    font-size: 0.95rem;
-    max-width: 100px;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    max-width: 95px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    color: #f1f5f9;
+  }
+
+  .live-dot {
+    width: 7px;
+    height: 7px;
+    box-shadow: 0 0 8px #10b981;
   }
 
   .user-count-badge {
     font-size: 0.72rem;
-    padding: 2px 7px;
+    padding: 4px 8px;
+    background: rgba(99, 102, 241, 0.18);
+    color: #a5b4fc;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: var(--radius-full);
+    font-weight: 700;
   }
 
-  /* Ping rozeti mobilde ufak */
   .ping-badge {
     font-size: 0.68rem;
-    padding: 2px 6px;
-    gap: 3px;
+    padding: 3px 8px;
+    border-radius: var(--radius-full);
+    gap: 4px;
   }
 
-  /* Üst butonların yazılarını gizle, sadece ikon göster */
+  /* Üst Aksiyon Butonları: Yuvarlak Glass İkonlar */
   .topbar-actions {
-    gap: 5px;
-    flex-shrink: 0;
+    gap: 6px;
+    display: flex;
+    align-items: center;
   }
 
   .topbar-actions .action-btn {
-    padding: 8px 10px;
-    min-width: unset;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: transform 0.15s ease, background 0.15s ease;
+  }
+
+  .topbar-actions .action-btn:active {
+    transform: scale(0.92);
   }
 
   .topbar-actions .action-btn span:not(.btn-icon) {
     display: none;
   }
 
-  /* Oda gövdesi: tek sütun, tab butonlarıyla paneller arası geçiş */
+  .topbar-actions .action-btn .btn-icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  .leave-btn {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
+    color: #f87171 !important;
+  }
+
+  .link-btn {
+    background: rgba(14, 165, 233, 0.15) !important;
+    border-color: rgba(14, 165, 233, 0.3) !important;
+    color: #38bdf8 !important;
+  }
+
+  /* =====================
+     2. ODA GÖVDESİ & TAB SİSTEMİ
+     ===================== */
   .room-body {
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr !important;
@@ -1008,9 +1094,9 @@ body {
     position: relative;
     overflow: hidden;
     min-height: 0;
+    background: radial-gradient(circle at 50% 10%, rgba(99, 102, 241, 0.08) 0%, transparent 60%);
   }
 
-  /* Paneller: mobilde tab seçimine göre görünür */
   .voice-panel,
   .chat-panel {
     display: none !important;
@@ -1029,195 +1115,467 @@ body {
     flex-direction: column;
   }
 
-  /* Panel başlıkları */
   .panel-header {
-    padding: 10px 14px;
+    padding: 10px 16px;
+    background: rgba(15, 23, 42, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
   }
 
   .panel-header h3 {
-    font-size: 0.88rem;
+    font-size: 0.85rem;
+    font-weight: 700;
   }
 
-  /* Katılımcı kartları: mobilde 2 sütunlu düzenli ızgara */
+  /* =====================
+     3. KATILIMCI KARTLARI (2 SÜTUNLU MODERN DÜZEN)
+     ===================== */
   .members-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    padding: 10px;
+    gap: 10px;
+    padding: 12px;
+    flex: 1;
+    overflow-y: auto;
+    align-content: start;
   }
 
   .member-card {
-    padding: 12px 8px;
+    background: linear-gradient(145deg, rgba(30, 41, 59, 0.75) 0%, rgba(15, 23, 42, 0.85) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    padding: 14px 10px 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    position: relative;
+    transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+
+  .member-card.speaking {
+    border-color: #10b981;
+    box-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+    animation: voiceGlowPulse 1.5s infinite;
+  }
+
+  .member-avatar-wrapper {
+    position: relative;
+    margin-bottom: 8px;
   }
 
   .member-avatar {
-    width: 44px;
-    height: 44px;
-    font-size: 1.15rem;
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .speaking-badge {
+    width: 18px;
+    height: 18px;
+    font-size: 0.6rem;
+    bottom: -2px;
+    right: -2px;
   }
 
   .member-name {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    max-width: 120px;
+    margin-bottom: 4px;
+    color: #f8fafc;
   }
 
-  /* Alt ses kontrol barı: taşmaları önleyici kompakt yapı */
-  .voice-dock {
-    padding: 8px 10px;
-    flex-shrink: 0;
-    gap: 8px;
-    flex-wrap: wrap;
-    background: rgba(15, 23, 42, 0.9);
+  .member-meta {
+    margin-bottom: 8px;
   }
 
-  .self-info {
+  .audio-tag {
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: var(--radius-full);
+  }
+
+  /* Kişi başı ses kontrolü (Modern Kompakt Slider) */
+  .user-volume-box {
+    margin-top: 4px;
+    padding: 4px 8px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-full);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .vol-icon-btn {
+    background: transparent;
+    border: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .user-volume-box input[type="range"] {
     flex: 1;
-    min-width: 120px;
-    gap: 8px;
+    height: 4px;
+    accent-color: #6366f1;
+    cursor: pointer;
+  }
+
+  .vol-percent-label {
+    font-size: 0.65rem;
+    font-family: monospace;
+    font-weight: 700;
+    color: #94a3b8;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  /* =====================
+     4. ALT KONTROL DOKU (FLOATING GLASS DOCK)
+     ===================== */
+  .voice-dock {
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Kendi kullanıcı bilgi satırı */
+  .self-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(30, 41, 59, 0.5);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, 0.05);
   }
 
   .self-avatar {
-    width: 34px;
-    height: 34px;
-    font-size: 0.85rem;
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+
+  .self-details {
+    flex: 1;
+    min-width: 0;
   }
 
   .self-name {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #f1f5f9;
   }
 
-  /* Mobilde yer kaplayan klavye filtre kutusunu gizle */
+  .mic-level-wrapper {
+    height: 4px;
+    margin-top: 2px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  /* Mobilde klavye filtre kutusu gizli kalsın */
   .noise-filter-box {
     display: none !important;
   }
 
-  /* Dock butonları: dokunmatik uyumlu ikon ağırlıklı */
+  /* Dock Butonları: Dokunmatik & İkon Ağırlıklı Tasarım */
   .dock-controls {
-    flex-wrap: wrap;
-    gap: 6px;
-    justify-content: flex-end;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 8px;
+    width: 100%;
   }
 
   .control-btn {
-    padding: 8px 10px;
-    font-size: 0.72rem;
-    gap: 4px;
-  }
-
-  .ctrl-icon {
-    font-size: 1rem;
-  }
-
-  /* Ekran paylaşımı mobilde tam genişlik */
-  .screen-share-container {
-    margin: 8px 10px 0;
-  }
-
-  /* Sohbet mesajları & giriş alanı */
-  .chat-messages {
-    padding: 10px 12px;
-    gap: 10px;
-  }
-
-  .msg-avatar {
-    width: 28px;
-    height: 28px;
-    font-size: 0.75rem;
-  }
-
-  .msg-bubble {
-    font-size: 0.85rem;
-    padding: 8px 12px;
-  }
-
-  .quick-emojis {
-    padding: 6px 8px;
-    gap: 4px;
-    overflow-x: auto;
-  }
-
-  .emoji-chip {
-    font-size: 1rem;
-    padding: 3px 6px;
-  }
-
-  .chat-input-area {
-    padding: 8px 10px;
-    gap: 6px;
-  }
-
-  #chat-input {
-    font-size: 0.88rem;
-    padding: 9px 12px;
-  }
-
-  /* Mobil Alt Gezinme Barı (Tab Bar) */
-  .mobile-tab-bar {
-    display: flex;
-    align-items: center;
-    background: #0b1120;
-    border-top: 1px solid var(--bg-card-border);
-    flex-shrink: 0;
-    z-index: 90;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  .mob-tab-btn {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 10px 8px;
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font-family: inherit;
-    font-size: 0.72rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: var(--transition);
-    border-top: 2px solid transparent;
+    gap: 4px;
+    padding: 8px 6px;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    color: #e2e8f0;
+    transition: transform 0.12s ease, background 0.15s ease;
   }
 
-  .mob-tab-btn.active {
-    color: #818cf8;
-    background: rgba(99, 102, 241, 0.1);
-    border-top-color: var(--primary);
+  .control-btn:active {
+    transform: scale(0.92);
   }
 
-  .mob-tab-icon {
+  .ctrl-icon {
     font-size: 1.25rem;
   }
 
+  .ctrl-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  /* Mikrofon butonu mobilde öne çıkan buton olsun */
+  #btn-toggle-mic {
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.25) 100%);
+    border-color: rgba(99, 102, 241, 0.4);
+    color: #c7d2fe;
+  }
+
+  #btn-toggle-mic.muted {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(220, 38, 38, 0.25) 100%) !important;
+    border-color: rgba(239, 68, 68, 0.45) !important;
+    color: #fca5a5 !important;
+  }
+
+  /* Ayarlar butonu ufak simge */
+  .settings-icon-btn {
+    flex: 0 0 42px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  /* =====================
+     5. YAZILI SOHBET (MOBİL POLİSH)
+     ===================== */
+  .chat-messages {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+
+  .message-row {
+    gap: 8px;
+  }
+
+  .msg-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 0.8rem;
+  }
+
+  .msg-bubble {
+    font-size: 0.875rem;
+    padding: 9px 13px;
+    border-radius: 16px 16px 16px 4px;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    line-height: 1.4;
+  }
+
+  .message-row.self .msg-bubble {
+    border-radius: 16px 16px 4px 16px;
+    background: linear-gradient(135deg, #4f46e5 0%, #6366f1 100%);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  }
+
+  /* Emoji çubuğu: yatay kaydırma */
+  .quick-emojis {
+    padding: 6px 10px;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .quick-emojis::-webkit-scrollbar {
+    display: none;
+  }
+
+  .emoji-chip {
+    font-size: 1.05rem;
+    padding: 4px 8px;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-full);
+  }
+
+  /* Sohbet giriş çubuğu: modern yuvarlatılmış pill */
+  .chat-input-area {
+    padding: 8px 12px;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.95);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .attach-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .attach-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  #chat-input {
+    font-size: 0.9rem;
+    padding: 10px 14px;
+    border-radius: var(--radius-full);
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  #chat-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+  }
+
+  .send-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary), #8b5cf6);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    flex-shrink: 0;
+  }
+
+  .send-btn svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  /* =====================
+     6. MOBİL ALT TAB ÇUBUĞU (PREMIUM GLASS BAR)
+     ===================== */
+  .mobile-tab-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(11, 17, 32, 0.94);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    z-index: 90;
+    padding: 6px 16px calc(6px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+  }
+
+  .mob-tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 16px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .mob-tab-btn:active {
+    transform: scale(0.95);
+  }
+
+  .mob-tab-btn.active {
+    color: #ffffff;
+    background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(139, 92, 246, 0.2) 100%);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.2);
+  }
+
+  .mob-tab-icon {
+    font-size: 1.15rem;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
   .mob-tab-label {
-    font-size: 0.68rem;
+    font-size: 0.8rem;
+    letter-spacing: -0.01em;
   }
 
-  /* Giriş Kartı */
+  /* Okunmamış mesaj kırmızı rozeti */
+  .unread-dot {
+    position: absolute;
+    top: -3px;
+    right: -5px;
+    width: 8px;
+    height: 8px;
+    background: #ef4444;
+    border-radius: 50%;
+    border: 2px solid #0b1120;
+    animation: unreadPulse 1.6s infinite;
+  }
+
+  /* =====================
+     7. GİRİŞ KARTI (MOBİL POLİSH)
+     ===================== */
   .join-card {
-    padding: 24px 18px;
-    margin: 12px;
+    padding: 28px 20px;
+    margin: 16px;
+    border-radius: 22px;
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
   }
 
-  /* Ayarlar Modalı */
+  .brand-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+  }
+
+  .brand-icon svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .join-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .color-picker-grid {
+    gap: 8px;
+  }
+
+  .color-swatch {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Modal responsive */
   .settings-card {
-    width: 95vw;
-    max-height: 88vh;
-  }
-
-  /* Kişi başı ses çubuğu */
-  .user-volume-box {
-    padding: 4px 6px;
-    gap: 4px;
-    font-size: 0.7rem;
+    width: 94vw;
+    max-height: 86vh;
+    border-radius: 20px;
   }
 }
 
 /* Tablet ara boyutlar (769px - 1024px) */
 @media (min-width: 769px) and (max-width: 1024px) {
   .room-body {
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr 340px;
   }
 
   .topbar-actions .action-btn span:not(.btn-icon) {

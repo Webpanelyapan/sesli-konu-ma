@@ -1482,6 +1482,11 @@ socket.on('chat-message', (data) => {
 
     if (!isSelf) {
       playSound('message');
+      const chatPanelEl = document.querySelector('.chat-panel');
+      const unreadDot = document.getElementById('chat-unread-dot');
+      if (chatPanelEl && !chatPanelEl.classList.contains('mob-active') && unreadDot) {
+        unreadDot.classList.remove('hidden');
+      }
     }
   }
 
@@ -1539,6 +1544,8 @@ function escapeHtml(str) {
     if (voicePanel) voicePanel.classList.remove('mob-active');
     chatTabBtn.classList.add('active');
     voiceTabBtn.classList.remove('active');
+    const unreadDot = document.getElementById('chat-unread-dot');
+    if (unreadDot) unreadDot.classList.add('hidden');
     const cm = document.getElementById('chat-messages');
     if (cm) cm.scrollTop = cm.scrollHeight;
   }
