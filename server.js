@@ -86,6 +86,7 @@ io.on('connection', (socket) => {
       isMuted: false,
       isDeafened: false,
       isSharingScreen: false,
+      isCameraOn: false,
       isAdmin: isHost
     };
 
@@ -180,6 +181,31 @@ io.on('connection', (socket) => {
     io.to(currentRoom).emit('user-screen-updated', {
       userId: socket.id,
       isSharing: currentUser.isSharingScreen
+    });
+  });
+
+  // Kamera durumu güncellemesi
+  socket.on('camera-state-change', ({ isCameraOn }) => {
+    if (!currentRoom || !currentUser) return;
+    const room = rooms.get(currentRoom);
+    if (!room) return;
+
+    currentUser.isCameraOn = !!isCameraOn;
+    room.users.set(socket.id, currentUser);
+
+    io.to(currentRoom).emit('user-camera-updated', {
+      userId: socket.id,
+      isCameraOn: currentUser.isCameraOn
+    });
+  });
+
+  // Yazıyor durumu (Typing Indicator)
+  socket.on('typing-state', ({ isTyping }) => {
+    if (!currentRoom || !currentUser) return;
+    socket.to(currentRoom).emit('user-typing', {
+      userId: socket.id,
+      username: currentUser.username,
+      isTyping: !!isTyping
     });
   });
 

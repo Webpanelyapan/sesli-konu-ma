@@ -1201,3 +1201,232 @@ body {
   font-weight: bold;
   cursor: pointer;
 }
+
+/* ========================================================
+   KAMERA, GELİŞMİŞ SES & AYARLAR STİLLERİ (PRO V3)
+   ======================================================== */
+
+/* Kamera Aktif Butonu */
+#btn-toggle-cam.active {
+  background: #10b981;
+  color: white;
+  border-color: #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.settings-icon-btn {
+  padding: 10px 12px;
+}
+
+/* Üye Kamera Video Alanı */
+.member-card {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.member-video {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-bottom: 10px;
+  background: #000;
+  display: block;
+}
+
+.member-card.has-camera .member-avatar-wrapper {
+  display: none;
+}
+
+.member-card.has-camera {
+  padding: 12px;
+}
+
+/* Kullanıcı Başına Ses Ayarı (Gelişmiş Boost & Mute) */
+.user-volume-box {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  width: 100%;
+  max-width: 170px;
+  border: 1px solid var(--bg-card-border);
+}
+
+.vol-icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.vol-percent-label {
+  font-family: monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #38bdf8;
+  min-width: 32px;
+  text-align: right;
+}
+
+/* Yazıyor Göstergesi */
+.typing-indicator {
+  padding: 4px 16px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: fadeIn 0.2s ease;
+}
+
+/* Ayarlar Modalı */
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(10px);
+  z-index: 99998;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.settings-card {
+  width: 100%;
+  max-width: 480px;
+  background: #1e293b;
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: modalEnter 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalEnter {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--bg-card-border);
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.settings-header h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.icon-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+.icon-close-btn:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.settings-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.settings-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settings-group label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.settings-select {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--bg-card-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.88rem;
+}
+.settings-select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.mic-test-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.test-meter-wrap {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-element);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.test-meter-bar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--success);
+  border-radius: var(--radius-full);
+  transition: width 0.05s ease;
+}
+
+.shortcuts-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.4);
+  padding: 12px;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+kbd {
+  background: var(--bg-element);
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-weight: bold;
+  border: 1px solid var(--bg-card-border);
+  margin-right: 4px;
+}

@@ -1,5 +1,5 @@
 // ========================================================
-// GÜÇLENDİRİLMİŞ SESLİ & YAZILI SOHBET İSTEMCİSİ (V2 PRO)
+// GÜÇLENDİRİLMİŞ SESLİ, KAMERALI & EKRAN SOHBET İSTEMCİSİ (V3 ULTRA)
 // ========================================================
 
 const socket = io();
@@ -45,22 +45,34 @@ const micThresholdMark = document.getElementById('mic-threshold-mark');
 const btnToggleFilter = document.getElementById('btn-toggle-filter');
 const filterSensitivity = document.getElementById('filter-sensitivity');
 const filterVal = document.getElementById('filter-val');
+const btnToggleCam = document.getElementById('btn-toggle-cam');
+const camIcon = document.getElementById('cam-icon');
 const btnTogglePtt = document.getElementById('btn-toggle-ptt');
 const pttLabel = document.getElementById('ptt-label');
 const btnToggleMic = document.getElementById('btn-toggle-mic');
 const btnToggleDeaf = document.getElementById('btn-toggle-deaf');
 const micIcon = document.getElementById('mic-icon');
 const deafIcon = document.getElementById('deaf-icon');
+const btnOpenSettings = document.getElementById('btn-open-settings');
 
 // Chat Elementleri
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const chatFileInput = document.getElementById('chat-file-input');
+const typingIndicator = document.getElementById('typing-indicator');
 const toastEl = document.getElementById('toast');
 const imageModal = document.getElementById('image-modal');
 const modalImg = document.getElementById('modal-img');
 const modalClose = document.getElementById('modal-close');
+
+// Ayarlar Modalı Elementleri
+const settingsModal = document.getElementById('settings-modal');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const selectMic = document.getElementById('select-mic');
+const btnTestMic = document.getElementById('btn-test-mic');
+const testMicMeter = document.getElementById('test-mic-meter');
+const selectQuality = document.getElementById('select-quality');
 
 // ========================================================
 // UYGULAMA DURUM DEĞİŞKENLERİ
@@ -71,25 +83,30 @@ let currentUser = null;
 let rawAudioStream = null;
 let localStream = null;
 let localScreenStream = null;
+let localCameraStream = null;
+let isCameraActive = false;
 let isMuted = false;
 let isDeafened = false;
 let isAdmin = false;
 let isPttActive = false;
 let isPttKeyDown = false;
+let screenQualityMode = 'smooth'; // 'smooth' (720p 30fps), 'high' (1080p), 'text' (15fps)
 
 // Gürültü ve Klavye Filtresi
-let isFilterActive = false; // Başlangıçta güvenli açık (kesinti olmaması için)
+let isFilterActive = false;
 let sensitivityThreshold = 14;
 let lastVoiceDetectedTime = 0;
 let gateGainNode = null;
 let biquadFilter = null;
 
-// WebRTC Eşler Haritası: userId -> { pc, candidateQueue: [], gainNode }
+// WebRTC Eşler Haritası: userId -> { pc, candidateQueue: [], screenSender, cameraSender, gainNode }
 const peers = new Map();
 // Odadaki kullanıcı bilgileri: userId -> userObject
 const roomUsers = new Map();
+// Kullanıcı başına ses seviyeleri: userId -> volume (0.0 to 2.0)
+const userVolumeSettings = new Map();
 
-// STUN + Global TURN Röle Sunucu Havuzu (Metered + Google + Twilio)
+// STUN + Global TURN Röle Sunucu Havuzu
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
@@ -97,7 +114,6 @@ const rtcConfig = {
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
-    // Metered TURN sunucuları (Symmetric NAT ve CGNAT mobil/farklı ev kısıtlamalarını aşar)
     {
       urls: 'turn:openrelay.metered.ca:80',
       username: 'openrelayproject',
@@ -123,6 +139,9 @@ let micAnalyser = null;
 let micAnimFrame = null;
 let isCurrentlySpeaking = false;
 let pingInterval = null;
+let typingTimeout = null;
+let isMicTesting = false;
+let micTestSource = null;
 
 // ========================================================
 // 1. OTOMATİK KURULUM & SESSION RECOVERY
@@ -131,7 +150,6 @@ let pingInterval = null;
   const params = new URLSearchParams(window.location.search);
   const roomParam = params.get('room');
 
-  // Önceki oturumu kontrol et (Sayfa yenilendiğinde kullanıcıyı kaybetmez!)
   const savedSession = sessionStorage.getItem('sesli_chat_session');
   if (savedSession) {
     try {
@@ -176,7 +194,6 @@ togglePwdBtn.addEventListener('click', () => {
   }
 });
 
-// Bildirim
 function showToast(message, type = 'normal') {
   toastEl.textContent = message;
   toastEl.className = 'toast show ' + type;
@@ -185,7 +202,6 @@ function showToast(message, type = 'normal') {
   }, 3200);
 }
 
-// Ses Efektleri
 function playSound(type = 'message') {
   try {
     const ctx = audioContext || new (window.AudioContext || window.webkitAudioContext)();
@@ -219,14 +235,19 @@ function playSound(type = 'message') {
 // ========================================================
 // 2. MİKROFON & SES İŞLEME ZİNCİRİ
 // ========================================================
-async function initLocalMicrophone() {
+async function initLocalMicrophone(deviceId = null) {
   try {
+    const audioConstraints = {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: false
+    };
+    if (deviceId) {
+      audioConstraints.deviceId = { exact: deviceId };
+    }
+
     rawAudioStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: false
-      },
+      audio: audioConstraints,
       video: false
     });
   } catch (err) {
@@ -243,6 +264,7 @@ async function initLocalMicrophone() {
   }
 
   setupAudioProcessing();
+  enumerateAudioDevices();
 }
 
 function setupAudioProcessing() {
@@ -256,23 +278,19 @@ function setupAudioProcessing() {
 
     const source = audioContext.createMediaStreamSource(rawAudioStream);
 
-    // 1. High-Pass Filtresi: 100Hz altı masa tıkırtısı ve klavye mekanik gövde seslerini keser
     biquadFilter = audioContext.createBiquadFilter();
     biquadFilter.type = 'highpass';
     biquadFilter.frequency.value = 110;
 
-    // 2. Akıllı Gürültü Kapısı (Noise Gate): Başlangıçta 1.0 (Açık) başlar, ses kesinlikle boğulmaz
     gateGainNode = audioContext.createGain();
     gateGainNode.gain.setValueAtTime(1.0, audioContext.currentTime);
 
-    // 3. WebRTC çıkışı
     const destination = audioContext.createMediaStreamDestination();
 
     source.connect(biquadFilter);
     biquadFilter.connect(gateGainNode);
     gateGainNode.connect(destination);
 
-    // Ham ses analizi
     micAnalyser = audioContext.createAnalyser();
     micAnalyser.fftSize = 256;
     source.connect(micAnalyser);
@@ -304,10 +322,12 @@ function setupVolumeMonitor() {
     if (selfMicMeter) {
       selfMicMeter.style.width = isMuted ? '0%' : `${volumePercent}%`;
     }
+    if (isMicTesting && testMicMeter) {
+      testMicMeter.style.width = `${volumePercent}%`;
+    }
 
     const now = performance.now();
 
-    // Filtre Açık İse Gürültü Kapısı Çalışır
     if (isFilterActive && !isMuted) {
       if (avg >= sensitivityThreshold) {
         lastVoiceDetectedTime = now;
@@ -322,7 +342,6 @@ function setupVolumeMonitor() {
       }
     }
 
-    // Konuşuyor tespiti
     const speaking = !isMuted && (isFilterActive ? (now - lastVoiceDetectedTime <= 300 && avg >= sensitivityThreshold) : avg > 10);
     if (speaking !== isCurrentlySpeaking) {
       isCurrentlySpeaking = speaking;
@@ -360,7 +379,190 @@ if (btnToggleFilter) {
 }
 
 // ========================================================
-// 3. BAS-KONUŞ (PUSH-TO-TALK) MODU
+// 3. KAMERA AÇ / KAPAT (WEBCAM)
+// ========================================================
+btnToggleCam.addEventListener('click', () => {
+  toggleCamera();
+});
+
+async function toggleCamera() {
+  if (isCameraActive) {
+    // Kamerayı Kapat
+    isCameraActive = false;
+    btnToggleCam.classList.remove('active');
+    camIcon.textContent = '📷';
+
+    if (localCameraStream) {
+      localCameraStream.getTracks().forEach(t => t.stop());
+      localCameraStream = null;
+    }
+
+    // Eşlerden kamera izini kaldır
+    peers.forEach((peerRecord, targetId) => {
+      if (peerRecord.cameraSender && peerRecord.pc) {
+        try {
+          peerRecord.pc.removeTrack(peerRecord.cameraSender);
+          peerRecord.cameraSender = null;
+          initiateWebRTCConnection(targetId);
+        } catch (e) {}
+      }
+    });
+
+    renderSelfCard();
+    socket.emit('camera-state-change', { isCameraOn: false });
+    showToast('Kamera kapatıldı.');
+  } else {
+    // Kamerayı Aç
+    try {
+      localCameraStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { max: 24 }
+        },
+        audio: false
+      });
+
+      isCameraActive = true;
+      btnToggleCam.classList.add('active');
+      camIcon.textContent = '📹';
+
+      const videoTrack = localCameraStream.getVideoTracks()[0];
+      videoTrack.contentHint = 'motion';
+
+      // Tüm eşlere kamera izini gönder
+      peers.forEach((peerRecord, targetId) => {
+        if (peerRecord.pc) {
+          try {
+            const sender = peerRecord.pc.addTrack(videoTrack, localCameraStream);
+            peerRecord.cameraSender = sender;
+            initiateWebRTCConnection(targetId);
+          } catch (e) {
+            console.error('Kamera gönderme hatası:', e);
+          }
+        }
+      });
+
+      renderSelfCard();
+      socket.emit('camera-state-change', { isCameraOn: true });
+      showToast('Kamera açıldı!');
+    } catch (err) {
+      console.warn('Kamera açılamadı veya izin verilmedi:', err);
+      showToast('Kamera erişim izni verilmedi veya bulunamadı!', 'error');
+    }
+  }
+}
+
+// ========================================================
+// 4. EKRAN PAYLAŞIMI (LAG GİDERİCİ DÜŞÜK GECİKME MOTORU)
+// ========================================================
+btnShareScreen.addEventListener('click', async () => {
+  if (localScreenStream) {
+    stopScreenSharing();
+  } else {
+    try {
+      // LAG ÖNLEME: Çözünürlük ve kare hızını sınırlayarak ev internetinin tıkanmasını engeller
+      let maxW = 1280;
+      let maxH = 720;
+      let maxFps = 30;
+      let bitrate = 1200000; // 1.2 Mbps (Lag yapmayan akıcı yayın)
+
+      if (screenQualityMode === 'high') {
+        maxW = 1920;
+        maxH = 1080;
+        maxFps = 30;
+        bitrate = 2400000;
+      } else if (screenQualityMode === 'text') {
+        maxW = 1920;
+        maxH = 1080;
+        maxFps = 15;
+        bitrate = 1000000;
+      }
+
+      localScreenStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          cursor: 'always',
+          width: { max: maxW },
+          height: { max: maxH },
+          frameRate: { max: maxFps }
+        },
+        audio: true
+      });
+
+      const videoTrack = localScreenStream.getVideoTracks()[0];
+      videoTrack.contentHint = (screenQualityMode === 'text' ? 'detail' : 'motion');
+
+      btnShareScreen.classList.add('active');
+      screenBtnText.textContent = 'Yayını Durdur';
+      screenVideo.srcObject = localScreenStream;
+      screenSharerName.textContent = 'Senin Ekranın (Canlı)';
+      screenShareView.classList.remove('hidden');
+
+      // Her eşe ekran izini ekle ve maksimum bitrate kodlama parametresini ata
+      peers.forEach((peerRecord, targetId) => {
+        if (peerRecord.pc) {
+          localScreenStream.getTracks().forEach(track => {
+            const sender = peerRecord.pc.addTrack(track, localScreenStream);
+            if (track.kind === 'video') {
+              peerRecord.screenSender = sender;
+              try {
+                const params = sender.getParameters();
+                if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
+                params.encodings[0].maxBitrate = bitrate;
+                params.encodings[0].maxFramerate = maxFps;
+                sender.setParameters(params).catch(() => {});
+              } catch (e) {}
+            }
+          });
+          initiateWebRTCConnection(targetId);
+        }
+      });
+
+      socket.emit('screen-share-state', { isSharing: true });
+
+      videoTrack.onended = () => {
+        stopScreenSharing();
+      };
+    } catch (err) {
+      console.warn('Ekran paylaşımı başlatılamadı:', err);
+    }
+  }
+});
+
+function stopScreenSharing() {
+  if (localScreenStream) {
+    localScreenStream.getTracks().forEach(t => t.stop());
+    localScreenStream = null;
+  }
+
+  // Eşlerden ekran izlerini temizle
+  peers.forEach((peerRecord, targetId) => {
+    if (peerRecord.screenSender && peerRecord.pc) {
+      try {
+        peerRecord.pc.removeTrack(peerRecord.screenSender);
+        peerRecord.screenSender = null;
+        initiateWebRTCConnection(targetId);
+      } catch (e) {}
+    }
+  });
+
+  btnShareScreen.classList.remove('active');
+  screenBtnText.textContent = 'Ekran Paylaş';
+  screenShareView.classList.add('hidden');
+  screenVideo.srcObject = null;
+  socket.emit('screen-share-state', { isSharing: false });
+}
+
+btnFullscreenScreen.addEventListener('click', () => {
+  if (!document.fullscreenElement) {
+    screenVideo.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+});
+
+// ========================================================
+// 5. BAS-KONUŞ (PUSH-TO-TALK)
 // ========================================================
 btnTogglePtt.addEventListener('click', () => {
   isPttActive = !isPttActive;
@@ -368,30 +570,42 @@ btnTogglePtt.addEventListener('click', () => {
   pttLabel.textContent = isPttActive ? 'Bas-Konuş: Açık (Boşluk)' : 'Bas-Konuş: Kapalı';
 
   if (isPttActive) {
-    // Bas-konuş açıldığında varsayılan olarak mute et
     setMuteState(true);
-    showToast('Bas-Konuş modu aktif! Konuşmak için Boşluk (Space) tuşuna basılı tutun.', 'normal');
+    showToast('Bas-Konuş modu aktif! Boşluk (Space) tuşuna basılı tutarak konuşun.', 'normal');
   } else {
     setMuteState(false);
-    showToast('Serbest konuşma moduna geçildi.');
+    showToast('Serbest konuşma modu aktif.');
   }
 });
 
 window.addEventListener('keydown', (e) => {
-  if (!isPttActive || !currentRoom) return;
-  // Eğer chat kutusuna yazı yazıyorsa PTT tetikleme
+  // Chat kutusunda yazı yazarken kısayolları engelle
   if (document.activeElement === chatInput) return;
 
-  if (e.code === 'Space' && !isPttKeyDown) {
+  // Space -> Bas-Konuş
+  if (isPttActive && e.code === 'Space' && !isPttKeyDown) {
     e.preventDefault();
     isPttKeyDown = true;
     setMuteState(false);
+    return;
+  }
+
+  // M -> Mikrofon
+  if (e.key === 'm' || e.key === 'M') {
+    setMuteState(!isMuted);
+  }
+  // D -> Kulaklık
+  if (e.key === 'd' || e.key === 'D') {
+    toggleDeafen();
+  }
+  // V -> Kamera
+  if (e.key === 'v' || e.key === 'V') {
+    toggleCamera();
   }
 });
 
 window.addEventListener('keyup', (e) => {
-  if (!isPttActive || !currentRoom) return;
-  if (e.code === 'Space' && isPttKeyDown) {
+  if (isPttActive && e.code === 'Space' && isPttKeyDown) {
     e.preventDefault();
     isPttKeyDown = false;
     setMuteState(true);
@@ -416,8 +630,23 @@ function setMuteState(muted) {
   socket.emit('audio-state-change', { isMuted, isDeafened });
 }
 
+function toggleDeafen() {
+  isDeafened = !isDeafened;
+  document.querySelectorAll('#remote-audios audio').forEach(audio => {
+    audio.muted = isDeafened;
+  });
+
+  btnToggleDeaf.classList.toggle('muted', isDeafened);
+  deafIcon.textContent = isDeafened ? '🔇' : '🎧';
+  showToast(isDeafened ? 'Oda sesi kapatıldı (Sağırlaştırıldı).' : 'Oda sesi açıldı.');
+  socket.emit('audio-state-change', { isMuted, isDeafened });
+}
+
+btnToggleMic.addEventListener('click', () => setMuteState(!isMuted));
+btnToggleDeaf.addEventListener('click', toggleDeafen);
+
 // ========================================================
-// 4. ODAYA KATILMA FORMU
+// 6. ODAYA KATILMA FORMU
 // ========================================================
 joinForm.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -462,7 +691,6 @@ joinForm.addEventListener('submit', async (e) => {
     currentUser = response.currentUser;
     isAdmin = !!response.isHost;
 
-    // Oturumu kaydet (Sayfa yenilendiğinde otomatik kurtarma)
     sessionStorage.setItem('sesli_chat_session', JSON.stringify({
       roomId: currentRoom,
       password,
@@ -470,7 +698,6 @@ joinForm.addEventListener('submit', async (e) => {
       color: currentUser.color
     }));
 
-    // URL'yi güncelle
     const newUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(currentRoom)}`;
     window.history.replaceState({ room: currentRoom }, '', newUrl);
 
@@ -482,7 +709,6 @@ joinForm.addEventListener('submit', async (e) => {
     selfAvatarPreview.textContent = currentUser.username.charAt(0).toUpperCase();
     selfAvatarPreview.style.backgroundColor = currentUser.color;
 
-    // Yönetici kontrolleri
     if (isAdmin) {
       selfHostBadge.classList.remove('hidden');
       btnLockRoom.classList.remove('hidden');
@@ -490,7 +716,6 @@ joinForm.addEventListener('submit', async (e) => {
 
     renderSelfCard();
 
-    // Mevcut kullanıcılara bağlan
     if (response.existingUsers && response.existingUsers.length > 0) {
       response.existingUsers.forEach(user => {
         addUserToRoom(user);
@@ -506,7 +731,7 @@ joinForm.addEventListener('submit', async (e) => {
 });
 
 // ========================================================
-// 5. PING / GECİKME TAKİBİ
+// 7. PING / GECİKME TAKİBİ
 // ========================================================
 function startPingMonitor() {
   if (pingInterval) clearInterval(pingInterval);
@@ -529,7 +754,7 @@ function startPingMonitor() {
 }
 
 // ========================================================
-// 6. WEBRTC GELİŞMİŞ EŞ BAĞLANTILARI & TURN RÖLESİ
+// 8. WEBRTC GELİŞMİŞ EŞ BAĞLANTILARI
 // ========================================================
 function createPeerConnection(targetUserId) {
   if (peers.has(targetUserId)) {
@@ -537,10 +762,16 @@ function createPeerConnection(targetUserId) {
   }
 
   const pc = new RTCPeerConnection(rtcConfig);
-  const peerRecord = { pc, candidateQueue: [] };
+  const peerRecord = {
+    pc,
+    candidateQueue: [],
+    screenSender: null,
+    cameraSender: null,
+    gainNode: null
+  };
   peers.set(targetUserId, peerRecord);
 
-  // Yerel ses izlerini ekle
+  // Ses izini ekle
   const streamToSend = localStream || rawAudioStream;
   if (streamToSend) {
     streamToSend.getAudioTracks().forEach(track => {
@@ -548,10 +779,18 @@ function createPeerConnection(targetUserId) {
     });
   }
 
-  // Eğer kendi ekranımızı paylaşıyorsak ekran izini de ekle
+  // Kamera açıksa kamera izini ekle
+  if (isCameraActive && localCameraStream) {
+    localCameraStream.getVideoTracks().forEach(track => {
+      peerRecord.cameraSender = pc.addTrack(track, localCameraStream);
+    });
+  }
+
+  // Ekran paylaşımı açıksa ekran izini ekle
   if (localScreenStream) {
     localScreenStream.getTracks().forEach(track => {
-      pc.addTrack(track, localScreenStream);
+      const sender = pc.addTrack(track, localScreenStream);
+      if (track.kind === 'video') peerRecord.screenSender = sender;
     });
   }
 
@@ -564,7 +803,6 @@ function createPeerConnection(targetUserId) {
     }
   };
 
-  // Karşıdan gelen ses veya video akışları
   pc.ontrack = (event) => {
     const track = event.track;
 
@@ -580,6 +818,12 @@ function createPeerConnection(targetUserId) {
       audioEl.srcObject = event.streams[0];
       audioEl.muted = isDeafened;
 
+      // Kullanıcının kayıtlı ses seviyesini uygula
+      const savedVol = userVolumeSettings.get(targetUserId);
+      if (savedVol !== undefined) {
+        audioEl.volume = Math.min(1, savedVol);
+      }
+
       const playPromise = audioEl.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
@@ -591,11 +835,29 @@ function createPeerConnection(targetUserId) {
         });
       }
     } else if (track.kind === 'video') {
-      // Ekran paylaşımı videosu geldi
-      screenVideo.srcObject = event.streams[0];
-      screenShareView.classList.remove('hidden');
       const u = roomUsers.get(targetUserId);
-      screenSharerName.textContent = u ? `${u.username} Ekranı` : 'Canlı Yayın';
+
+      // Ekran yayını mı yoksa kamera mı ayırt et
+      if (u && u.isSharingScreen) {
+        screenVideo.srcObject = event.streams[0];
+        screenShareView.classList.remove('hidden');
+        screenSharerName.textContent = `${u.username} Ekranı (Canlı)`;
+      } else {
+        // Üyenin kartındaki video kutusuna kamerayı bağla
+        const card = document.getElementById(`card-${targetUserId}`);
+        if (card) {
+          let cardVideo = card.querySelector('.member-video');
+          if (!cardVideo) {
+            cardVideo = document.createElement('video');
+            cardVideo.className = 'member-video';
+            cardVideo.autoplay = true;
+            cardVideo.playsInline = true;
+            card.prepend(cardVideo);
+          }
+          cardVideo.srcObject = event.streams[0];
+          card.classList.add('has-camera');
+        }
+      }
     }
   };
 
@@ -702,66 +964,7 @@ function cleanupPeer(userId) {
 }
 
 // ========================================================
-// 7. CANLI EKRAN PAYLAŞIMI
-// ========================================================
-btnShareScreen.addEventListener('click', async () => {
-  if (localScreenStream) {
-    stopScreenSharing();
-  } else {
-    try {
-      localScreenStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always' },
-        audio: true
-      });
-
-      btnShareScreen.classList.add('active');
-      screenBtnText.textContent = 'Yayını Durdur';
-      screenVideo.srcObject = localScreenStream;
-      screenSharerName.textContent = 'Senin Ekranın';
-      screenShareView.classList.remove('hidden');
-
-      // Ekran izlerini tüm eşlere gönder
-      peers.forEach(({ pc }, targetId) => {
-        localScreenStream.getTracks().forEach(track => {
-          pc.addTrack(track, localScreenStream);
-        });
-        initiateWebRTCConnection(targetId);
-      });
-
-      socket.emit('screen-share-state', { isSharing: true });
-
-      // Kullanıcı tarayıcı arayüzünden paylaşımı durdurursa
-      localScreenStream.getVideoTracks()[0].onended = () => {
-        stopScreenSharing();
-      };
-    } catch (err) {
-      console.warn('Ekran paylaşımı iptal edildi veya hata oluştu:', err);
-    }
-  }
-});
-
-function stopScreenSharing() {
-  if (localScreenStream) {
-    localScreenStream.getTracks().forEach(t => t.stop());
-    localScreenStream = null;
-  }
-  btnShareScreen.classList.remove('active');
-  screenBtnText.textContent = 'Ekran Paylaş';
-  screenShareView.classList.add('hidden');
-  screenVideo.srcObject = null;
-  socket.emit('screen-share-state', { isSharing: false });
-}
-
-btnFullscreenScreen.addEventListener('click', () => {
-  if (!document.fullscreenElement) {
-    screenVideo.requestFullscreen().catch(() => {});
-  } else {
-    document.exitFullscreen().catch(() => {});
-  }
-});
-
-// ========================================================
-// 8. ODA VE KULLANICI ETKİLEŞİMLERİ
+// 9. ODA VE KULLANICI ETKİLEŞİMLERİ
 // ========================================================
 socket.on('user-joined', ({ user }) => {
   addUserToRoom(user);
@@ -786,6 +989,30 @@ socket.on('user-audio-updated', ({ userId, isMuted: muted }) => {
   }
 });
 
+socket.on('user-camera-updated', ({ userId, isCameraOn }) => {
+  const u = roomUsers.get(userId);
+  if (u) u.isCameraOn = isCameraOn;
+
+  const card = document.getElementById(`card-${userId}`);
+  if (card) {
+    if (!isCameraOn) {
+      const vid = card.querySelector('.member-video');
+      if (vid) vid.remove();
+      card.classList.remove('has-camera');
+    }
+  }
+});
+
+socket.on('user-screen-updated', ({ userId, isSharing }) => {
+  const u = roomUsers.get(userId);
+  if (u) u.isSharingScreen = isSharing;
+
+  if (!isSharing && screenSharerName.textContent.includes(u ? u.username : '')) {
+    screenShareView.classList.add('hidden');
+    screenVideo.srcObject = null;
+  }
+});
+
 socket.on('user-speaking-state', ({ userId, isSpeaking }) => {
   const card = document.getElementById(`card-${userId}`);
   if (card) {
@@ -793,13 +1020,11 @@ socket.on('user-speaking-state', ({ userId, isSpeaking }) => {
   }
 });
 
-// Yönetici Devri & Eylemleri
 socket.on('promoted-to-host', () => {
   isAdmin = true;
   selfHostBadge.classList.remove('hidden');
   btnLockRoom.classList.remove('hidden');
   showToast('Tebrikler! Oda yöneticisi (Host) siz oldunuz.', 'success');
-  // Tüm kartları tekrar çizerek kick butonlarını ekle
   roomUsers.forEach(u => addUserToRoom(u));
 });
 
@@ -817,7 +1042,6 @@ socket.on('forced-mute', () => {
   showToast('Oda yöneticisi mikrofonunuzu kapattı.', 'error');
 });
 
-// Odayı Kilitleme Butonu
 btnLockRoom.addEventListener('click', () => {
   socket.emit('admin-toggle-lock', ({ isLocked }) => {
     lockBtnText.textContent = isLocked ? '🔓 Kilidi Aç' : '🔒 Odayı Kilitle';
@@ -830,7 +1054,7 @@ socket.on('room-lock-changed', ({ isLocked }) => {
 });
 
 // ========================================================
-// 9. KULLANICI KARTLARI & ÖZEL SES AYARI (VOLUME SLIDER)
+// 10. KULLANICI KARTLARI & GELİŞMİŞ SES AYARI (0% - 200%)
 // ========================================================
 function renderSelfCard() {
   let card = document.getElementById(`card-${currentUser.id}`);
@@ -841,7 +1065,28 @@ function renderSelfCard() {
     membersList.appendChild(card);
   }
 
+  // Kendi kameramız açık mı?
+  let videoHtml = '';
+  if (isCameraActive && localCameraStream) {
+    card.classList.add('has-camera');
+    let myVid = card.querySelector('.member-video');
+    if (!myVid) {
+      myVid = document.createElement('video');
+      myVid.className = 'member-video';
+      myVid.autoplay = true;
+      myVid.playsInline = true;
+      myVid.muted = true;
+      card.prepend(myVid);
+    }
+    myVid.srcObject = localCameraStream;
+  } else {
+    card.classList.remove('has-camera');
+    const myVid = card.querySelector('.member-video');
+    if (myVid) myVid.remove();
+  }
+
   card.innerHTML = `
+    ${card.querySelector('.member-video') ? card.querySelector('.member-video').outerHTML : ''}
     <div class="member-avatar-wrapper">
       <div class="member-avatar" style="--avatar-color: ${currentUser.color}">
         ${currentUser.username.charAt(0).toUpperCase()}
@@ -852,10 +1097,16 @@ function renderSelfCard() {
     <div class="member-meta">
       <div class="member-audio-badges">
         <span class="audio-tag audio-tag-mute ${isMuted ? 'muted' : ''}">${isMuted ? 'Sessiz' : 'Açık'}</span>
+        ${isCameraActive ? '<span class="audio-tag">📹 Kamera</span>' : ''}
         ${isAdmin ? '<span class="host-badge">👑 Host</span>' : ''}
       </div>
     </div>
   `;
+
+  if (isCameraActive && localCameraStream) {
+    const v = card.querySelector('.member-video');
+    if (v) v.srcObject = localCameraStream;
+  }
 }
 
 function updateSelfSpeakingCard(speaking) {
@@ -881,6 +1132,9 @@ function addUserToRoom(user) {
     </div>
   ` : '';
 
+  const currentVol = userVolumeSettings.get(user.id) ?? 1.0;
+  const percentText = Math.round(currentVol * 100) + '%';
+
   card.innerHTML = `
     ${kickBtnHtml}
     <div class="member-avatar-wrapper">
@@ -896,18 +1150,39 @@ function addUserToRoom(user) {
         ${user.isAdmin ? '<span class="host-badge">👑 Host</span>' : ''}
       </div>
     </div>
-    <!-- Kullanıcıya Özel Ses Seviyesi Kaydırıcısı -->
-    <div class="user-volume-box" title="Bu kişinin ses seviyesini ayarla">
-      <span>🔊</span>
-      <input type="range" min="0" max="1" step="0.05" value="1" oninput="changeUserVolume('${user.id}', this.value)">
+    <!-- Kişi Başı Ses Ayarı (0% - 200% Ses Yükseltme) -->
+    <div class="user-volume-box" title="Bu kişinin sesini ayarla veya yükselt">
+      <button type="button" class="vol-icon-btn" onclick="toggleMuteUserVolume('${user.id}')" title="Sesi Tamamen Kıs/Aç">🔊</button>
+      <input type="range" id="vol-range-${user.id}" min="0" max="2" step="0.05" value="${currentVol}" oninput="changeUserVolume('${user.id}', this.value)">
+      <span class="vol-percent-label" id="vol-lbl-${user.id}">${percentText}</span>
     </div>
   `;
 }
 
-window.changeUserVolume = function(userId, vol) {
+window.changeUserVolume = function(userId, volValue) {
+  const vol = parseFloat(volValue);
+  userVolumeSettings.set(userId, vol);
+
   const audioEl = document.getElementById(`audio-${userId}`);
   if (audioEl) {
-    audioEl.volume = parseFloat(vol);
+    audioEl.volume = Math.min(1.0, vol);
+  }
+
+  const lbl = document.getElementById(`vol-lbl-${userId}`);
+  if (lbl) {
+    lbl.textContent = vol === 0 ? 'Mute' : Math.round(vol * 100) + '%';
+  }
+};
+
+window.toggleMuteUserVolume = function(userId) {
+  const currentVol = userVolumeSettings.get(userId) ?? 1.0;
+  const rangeInput = document.getElementById(`vol-range-${userId}`);
+  if (currentVol > 0) {
+    window.changeUserVolume(userId, 0);
+    if (rangeInput) rangeInput.value = 0;
+  } else {
+    window.changeUserVolume(userId, 1.0);
+    if (rangeInput) rangeInput.value = 1.0;
   }
 };
 
@@ -919,6 +1194,7 @@ window.kickUser = function(userId) {
 
 function removeUserFromRoom(userId) {
   roomUsers.delete(userId);
+  userVolumeSettings.delete(userId);
   const card = document.getElementById(`card-${userId}`);
   if (card) card.remove();
 }
@@ -929,25 +1205,83 @@ function updateUserCount() {
 }
 
 // ========================================================
-// 10. MİKROFON & SAĞIRLAŞTIRMA BUTONLARI
+// 11. AYARLAR MODALI & MİKROFON LOOPBACK TESTİ
 // ========================================================
-btnToggleMic.addEventListener('click', () => {
-  setMuteState(!isMuted);
+btnOpenSettings.addEventListener('click', () => {
+  settingsModal.classList.remove('hidden');
+  enumerateAudioDevices();
 });
 
-btnToggleDeaf.addEventListener('click', () => {
-  isDeafened = !isDeafened;
-  document.querySelectorAll('#remote-audios audio').forEach(audio => {
-    audio.muted = isDeafened;
-  });
-
-  btnToggleDeaf.classList.toggle('muted', isDeafened);
-  deafIcon.textContent = isDeafened ? '🔇' : '🎧';
-  showToast(isDeafened ? 'Oda sesi kapatıldı (Sağırlaştırıldı).' : 'Oda sesi açıldı.');
-  socket.emit('audio-state-change', { isMuted, isDeafened });
+btnCloseSettings.addEventListener('click', () => {
+  settingsModal.classList.add('hidden');
+  stopMicTest();
 });
 
-// Davet linkini kopyala
+settingsModal.addEventListener('click', (e) => {
+  if (e.target === settingsModal) {
+    settingsModal.classList.add('hidden');
+    stopMicTest();
+  }
+});
+
+async function enumerateAudioDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    selectMic.innerHTML = '';
+    const audioInputs = devices.filter(d => d.kind === 'audioinput');
+    audioInputs.forEach((device, index) => {
+      const option = document.createElement('option');
+      option.value = device.deviceId;
+      option.textContent = device.label || `Mikrofon ${index + 1}`;
+      selectMic.appendChild(option);
+    });
+  } catch (e) {}
+}
+
+selectMic.addEventListener('change', () => {
+  const selectedDeviceId = selectMic.value;
+  initLocalMicrophone(selectedDeviceId);
+  showToast('Mikrofon aygıtı değiştirildi.');
+});
+
+selectQuality.addEventListener('change', (e) => {
+  screenQualityMode = e.target.value;
+  showToast(`Ekran kalitesi: ${e.target.options[e.target.selectedIndex].text}`);
+});
+
+btnTestMic.addEventListener('click', () => {
+  if (isMicTesting) {
+    stopMicTest();
+  } else {
+    startMicTest();
+  }
+});
+
+function startMicTest() {
+  if (!rawAudioStream || !audioContext) return;
+  try {
+    micTestSource = audioContext.createMediaStreamSource(rawAudioStream);
+    micTestSource.connect(audioContext.destination);
+    isMicTesting = true;
+    btnTestMic.textContent = '⏹️ Testi Durdur';
+    btnTestMic.classList.add('active');
+  } catch (e) {}
+}
+
+function stopMicTest() {
+  if (micTestSource) {
+    try { micTestSource.disconnect(); } catch (e) {}
+    micTestSource = null;
+  }
+  isMicTesting = false;
+  btnTestMic.textContent = 'Kendi Sesini Test Et';
+  btnTestMic.classList.remove('active');
+  if (testMicMeter) testMicMeter.style.width = '0%';
+}
+
+// ========================================================
+// 12. ODADAN AYRILMA & DAVET
+// ========================================================
 btnCopyLink.addEventListener('click', async () => {
   if (!currentRoom) return;
   const roomUrl = `${window.location.origin}${window.location.pathname}?room=${encodeURIComponent(currentRoom)}`;
@@ -969,7 +1303,6 @@ btnCopyLink.addEventListener('click', async () => {
   }
 });
 
-// Odadan Ayrıl
 btnLeaveRoom.addEventListener('click', () => {
   if (confirm('Odadan ayrılmak istiyor musunuz?')) {
     leaveCurrentRoom(true);
@@ -984,6 +1317,7 @@ function leaveCurrentRoom(clearSession = true) {
   }
 
   stopScreenSharing();
+  if (isCameraActive) toggleCamera();
 
   if (rawAudioStream) {
     rawAudioStream.getTracks().forEach(track => track.stop());
@@ -1007,6 +1341,7 @@ function leaveCurrentRoom(clearSession = true) {
   });
   peers.clear();
   roomUsers.clear();
+  userVolumeSettings.clear();
 
   remoteAudios.innerHTML = '';
   membersList.innerHTML = '';
@@ -1022,7 +1357,7 @@ function leaveCurrentRoom(clearSession = true) {
 }
 
 // ========================================================
-// 11. YAZILI SOHBET & RESİM / DOSYA PAYLAŞIMI
+// 13. YAZILI SOHBET & RESİM / DOSYA PAYLAŞIMI
 // ========================================================
 chatForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -1031,9 +1366,27 @@ chatForm.addEventListener('submit', (e) => {
 
   socket.emit('send-chat', { text });
   chatInput.value = '';
+  socket.emit('typing-state', { isTyping: false });
 });
 
-// Dosya seçilerek gönderildiğinde
+chatInput.addEventListener('input', () => {
+  socket.emit('typing-state', { isTyping: true });
+  if (typingTimeout) clearTimeout(typingTimeout);
+  typingTimeout = setTimeout(() => {
+    socket.emit('typing-state', { isTyping: false });
+  }, 2000);
+});
+
+socket.on('user-typing', ({ username, isTyping }) => {
+  if (!typingIndicator) return;
+  if (isTyping) {
+    typingIndicator.textContent = `💬 ${username} yazıyor...`;
+    typingIndicator.classList.remove('hidden');
+  } else {
+    typingIndicator.classList.add('hidden');
+  }
+});
+
 chatFileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1056,7 +1409,6 @@ chatFileInput.addEventListener('change', (e) => {
   reader.readAsDataURL(file);
 });
 
-// Resim Yapıştırma (Ctrl + V) Desteği!
 window.addEventListener('paste', (e) => {
   if (!currentRoom) return;
   const items = (e.clipboardData || e.originalEvent.clipboardData).items;
@@ -1067,7 +1419,7 @@ window.addEventListener('paste', (e) => {
       const reader = new FileReader();
       reader.onload = () => {
         socket.emit('send-chat', {
-          text: '📸 Ekran Görüntüsü Yapıştırıldı',
+          text: '📸 Ekran Görüntüsü',
           fileData: reader.result,
           fileName: 'resim.png',
           fileType: blob.type
@@ -1079,7 +1431,6 @@ window.addEventListener('paste', (e) => {
   }
 });
 
-// Hızlı Emojiler
 document.querySelectorAll('.emoji-chip').forEach(btn => {
   btn.addEventListener('click', () => {
     chatInput.value += btn.dataset.emoji;
@@ -1132,7 +1483,6 @@ socket.on('chat-message', (data) => {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
-// Lightbox (Resim büyütme)
 window.openLightbox = function(src) {
   modalImg.src = src;
   imageModal.classList.remove('hidden');

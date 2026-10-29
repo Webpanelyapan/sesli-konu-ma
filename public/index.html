@@ -210,6 +210,12 @@
           </div>
 
           <div class="dock-controls">
+            <!-- Kamera Butonu -->
+            <button id="btn-toggle-cam" class="control-btn" title="Kamerayı Aç / Kapat (Kısayol: V)">
+              <span class="ctrl-icon" id="cam-icon">📷</span>
+              <span class="ctrl-label">Kamera</span>
+            </button>
+
             <!-- Bas-Konuş Modu Butonu -->
             <button id="btn-toggle-ptt" class="control-btn ptt-btn" title="Bas-Konuş Modunu Aç/Kapat (Boşluk Tuşu)">
               <span class="ctrl-icon">⌨️</span>
@@ -217,15 +223,20 @@
             </button>
 
             <!-- Mikrofon Butonu -->
-            <button id="btn-toggle-mic" class="control-btn active" title="Mikrofonu Kapat / Aç">
+            <button id="btn-toggle-mic" class="control-btn active" title="Mikrofonu Kapat / Aç (Kısayol: M)">
               <span class="ctrl-icon" id="mic-icon">🎙️</span>
               <span class="ctrl-label">Mikrofon</span>
             </button>
 
             <!-- Kulaklık Butonu -->
-            <button id="btn-toggle-deaf" class="control-btn" title="Sesi Kapat / Aç">
+            <button id="btn-toggle-deaf" class="control-btn" title="Sesi Kapat / Aç (Kısayol: D)">
               <span class="ctrl-icon" id="deaf-icon">🎧</span>
               <span class="ctrl-label">Kulaklık</span>
+            </button>
+
+            <!-- Ayarlar Butonu -->
+            <button id="btn-open-settings" class="control-btn settings-icon-btn" title="Ses, Mikrofon ve Görüntü Ayarları">
+              <span class="ctrl-icon">⚙️</span>
             </button>
           </div>
         </div>
@@ -260,6 +271,9 @@
           <button type="button" class="emoji-chip" data-emoji="👏">👏</button>
         </div>
 
+        <!-- Yazıyor Göstergesi -->
+        <div id="typing-indicator" class="typing-indicator hidden">💬 Biri yazıyor...</div>
+
         <!-- Mesaj Gönderme Formu (Resim/Dosya Ekleme Destekli) -->
         <form id="chat-form" class="chat-input-area">
           <label for="chat-file-input" class="attach-btn" title="Resim veya Görsel Gönder">
@@ -286,6 +300,53 @@
   <div id="image-modal" class="image-modal hidden">
     <span class="modal-close" id="modal-close">&times;</span>
     <img id="modal-img" class="modal-content" src="" alt="Önizleme">
+  </div>
+
+  <!-- Ayarlar Modal -->
+  <div id="settings-modal" class="settings-modal hidden">
+    <div class="settings-card">
+      <div class="settings-header">
+        <h3>⚙️ Ses & Cihaz Ayarları</h3>
+        <button id="btn-close-settings" class="icon-close-btn">&times;</button>
+      </div>
+      <div class="settings-body">
+        <div class="settings-group">
+          <label for="select-mic">🎙️ Mikrofon Girişi</label>
+          <select id="select-mic" class="settings-select"></select>
+        </div>
+
+        <div class="settings-group">
+          <label>🔊 Mikrofon Testi</label>
+          <div class="mic-test-row">
+            <button type="button" id="btn-test-mic" class="action-btn link-btn">Kendi Sesini Test Et</button>
+            <div class="test-meter-wrap">
+              <span id="test-mic-meter" class="test-meter-bar"></span>
+            </div>
+          </div>
+          <span class="hint">Konuşurken kendi sesinizi kulaklığınızdan gecikmesiz duyabilirsiniz.</span>
+        </div>
+
+        <div class="settings-group">
+          <label for="select-quality">📺 Ekran Paylaşım Kalitesi</label>
+          <select id="select-quality" class="settings-select">
+            <option value="smooth" selected>Düşük Gecikme & Akıcı (720p 30fps - Tavsiye Edilen)</option>
+            <option value="high">Yüksek Kalite (1080p 30fps - Hızlı İnternet)</option>
+            <option value="text">Net Metin / Kod (1080p 15fps)</option>
+          </select>
+          <span class="hint">İnternette donma veya takılma oluyorsa 'Düşük Gecikme' seçin.</span>
+        </div>
+
+        <div class="settings-group">
+          <label>⌨️ Kısayol Tuşları</label>
+          <div class="shortcuts-list">
+            <div><kbd>M</kbd> Mikrofonu Aç/Kapat</div>
+            <div><kbd>D</kbd> Kulaklığı Aç/Kapat (Sağırlaştır)</div>
+            <div><kbd>V</kbd> Kamerayı Aç/Kapat</div>
+            <div><kbd>Boşluk</kbd> Bas-Konuş (PTT Açıkken)</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Ses elementleri için gizli container (WebRTC gelen ses akışları) -->
