@@ -1,8 +1,8 @@
 // ========================================================
-// GÜÇLENDİRİLMİŞ SESLİ, KAMERALI & EKRAN SOHBET İSTEMCİSİ (V3 ULTRA)
+// GÜÇLENDİRİLMİŞ SESLİ, KAMERALI & EKRAN SOHBET İSTEMCİSİ (V4 ULTRA)
 // ========================================================
 
-const socket = io();
+const socket = io({ transports: ['websocket'], upgrade: false });
 
 // DOM Elementleri - Giriş Ekranı
 const joinScreen = document.getElementById('join-screen');
@@ -737,20 +737,25 @@ function startPingMonitor() {
   if (pingInterval) clearInterval(pingInterval);
   pingInterval = setInterval(() => {
     const start = performance.now();
-    socket.emit('ping-measure', start, (clientTime) => {
-      const rtt = Math.round(performance.now() - clientTime);
+    socket.emit('ping-measure', start, () => {
+      const rtt = Math.round(performance.now() - start);
       if (pingBadge) {
-        pingBadge.querySelector('span').textContent = `${rtt} ms`;
-        if (rtt < 80) {
-          pingBadge.style.color = '#34d399';
-        } else if (rtt < 180) {
-          pingBadge.style.color = '#fbbf24';
+        if (rtt > 1500) {
+          pingBadge.querySelector('span').textContent = 'Uyanıyor...';
+          pingBadge.style.color = '#f59e0b';
         } else {
-          pingBadge.style.color = '#f87171';
+          pingBadge.querySelector('span').textContent = `${rtt} ms`;
+          if (rtt < 80) {
+            pingBadge.style.color = '#34d399';
+          } else if (rtt < 200) {
+            pingBadge.style.color = '#fbbf24';
+          } else {
+            pingBadge.style.color = '#f87171';
+          }
         }
       }
     });
-  }, 3500);
+  }, 2000);
 }
 
 // ========================================================
@@ -1510,3 +1515,37 @@ function escapeHtml(str) {
     }[m];
   });
 }
+
+// ========================================================
+// 14. MOBİL TAB GEÇİŞİ (SES / SOHBET)
+// ========================================================
+(function setupMobileTabs() {
+  const voiceTabBtn = document.getElementById('mob-tab-voice');
+  const chatTabBtn = document.getElementById('mob-tab-chat');
+  const voicePanel = document.querySelector('.voice-panel');
+  const chatPanel = document.querySelector('.chat-panel');
+
+  if (!voiceTabBtn || !chatTabBtn) return;
+
+  function showVoice() {
+    if (voicePanel) voicePanel.classList.add('mob-active');
+    if (chatPanel) chatPanel.classList.remove('mob-active');
+    voiceTabBtn.classList.add('active');
+    chatTabBtn.classList.remove('active');
+  }
+
+  function showChat() {
+    if (chatPanel) chatPanel.classList.add('mob-active');
+    if (voicePanel) voicePanel.classList.remove('mob-active');
+    chatTabBtn.classList.add('active');
+    voiceTabBtn.classList.remove('active');
+    const cm = document.getElementById('chat-messages');
+    if (cm) cm.scrollTop = cm.scrollHeight;
+  }
+
+  voiceTabBtn.addEventListener('click', showVoice);
+  chatTabBtn.addEventListener('click', showChat);
+
+  // Varsayılan: Ses sekmesi açık
+  showVoice();
+})();

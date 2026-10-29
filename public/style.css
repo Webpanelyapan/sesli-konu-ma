@@ -411,6 +411,7 @@ body {
   grid-template-columns: 1fr 380px;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* SOL PANEL: SES VE KATILIMCILAR */
@@ -933,18 +934,298 @@ body {
   display: none !important;
 }
 
-/* Responsive */
-@media (max-width: 860px) {
+/* ========================================================
+   MOBİL & TABLET RESPONSIVE TASARIM
+   ======================================================== */
+
+/* Mobil alt menü çubuğu - masaüstünde gizli */
+.mobile-tab-bar {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  /* Oda kapsayıcısı ekrana tam sığsın */
+  .room-container {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Üst bar: mobilde taşmayan kompakt tasarım */
+  .room-topbar {
+    padding: 8px 12px;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .room-identity {
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .room-identity h2 {
+    font-size: 0.95rem;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .user-count-badge {
+    font-size: 0.72rem;
+    padding: 2px 7px;
+  }
+
+  /* Ping rozeti mobilde ufak */
+  .ping-badge {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    gap: 3px;
+  }
+
+  /* Üst butonların yazılarını gizle, sadece ikon göster */
+  .topbar-actions {
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .topbar-actions .action-btn {
+    padding: 8px 10px;
+    min-width: unset;
+  }
+
+  .topbar-actions .action-btn span:not(.btn-icon) {
+    display: none;
+  }
+
+  /* Oda gövdesi: tek sütun, tab butonlarıyla paneller arası geçiş */
   .room-body {
-    grid-template-columns: 1fr;
-    grid-template-rows: 1fr 1fr;
+    grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    min-height: 0;
   }
-  .voice-panel {
+
+  /* Paneller: mobilde tab seçimine göre görünür */
+  .voice-panel,
+  .chat-panel {
+    display: none !important;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
     border-right: none;
-    border-bottom: 1px solid var(--bg-card-border);
+    border-bottom: none;
+    overflow: hidden;
   }
+
+  .voice-panel.mob-active,
+  .chat-panel.mob-active {
+    display: flex !important;
+    flex-direction: column;
+  }
+
+  /* Panel başlıkları */
+  .panel-header {
+    padding: 10px 14px;
+    flex-shrink: 0;
+  }
+
+  .panel-header h3 {
+    font-size: 0.88rem;
+  }
+
+  /* Katılımcı kartları: mobilde 2 sütunlu düzenli ızgara */
+  .members-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .member-card {
+    padding: 12px 8px;
+  }
+
+  .member-avatar {
+    width: 44px;
+    height: 44px;
+    font-size: 1.15rem;
+  }
+
+  .member-name {
+    font-size: 0.78rem;
+  }
+
+  /* Alt ses kontrol barı: taşmaları önleyici kompakt yapı */
+  .voice-dock {
+    padding: 8px 10px;
+    flex-shrink: 0;
+    gap: 8px;
+    flex-wrap: wrap;
+    background: rgba(15, 23, 42, 0.9);
+  }
+
+  .self-info {
+    flex: 1;
+    min-width: 120px;
+    gap: 8px;
+  }
+
+  .self-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 0.85rem;
+  }
+
+  .self-name {
+    font-size: 0.82rem;
+  }
+
+  /* Mobilde yer kaplayan klavye filtre kutusunu gizle */
+  .noise-filter-box {
+    display: none !important;
+  }
+
+  /* Dock butonları: dokunmatik uyumlu ikon ağırlıklı */
+  .dock-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+  }
+
+  .control-btn {
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    gap: 4px;
+  }
+
+  .ctrl-icon {
+    font-size: 1rem;
+  }
+
+  /* Ekran paylaşımı mobilde tam genişlik */
+  .screen-share-container {
+    margin: 8px 10px 0;
+  }
+
+  /* Sohbet mesajları & giriş alanı */
+  .chat-messages {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+
+  .msg-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .msg-bubble {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+  }
+
+  .quick-emojis {
+    padding: 6px 8px;
+    gap: 4px;
+    overflow-x: auto;
+  }
+
+  .emoji-chip {
+    font-size: 1rem;
+    padding: 3px 6px;
+  }
+
+  .chat-input-area {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  #chat-input {
+    font-size: 0.88rem;
+    padding: 9px 12px;
+  }
+
+  /* Mobil Alt Gezinme Barı (Tab Bar) */
+  .mobile-tab-bar {
+    display: flex;
+    align-items: center;
+    background: #0b1120;
+    border-top: 1px solid var(--bg-card-border);
+    flex-shrink: 0;
+    z-index: 90;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mob-tab-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    border-top: 2px solid transparent;
+  }
+
+  .mob-tab-btn.active {
+    color: #818cf8;
+    background: rgba(99, 102, 241, 0.1);
+    border-top-color: var(--primary);
+  }
+
+  .mob-tab-icon {
+    font-size: 1.25rem;
+  }
+
+  .mob-tab-label {
+    font-size: 0.68rem;
+  }
+
+  /* Giriş Kartı */
   .join-card {
-    padding: 24px;
+    padding: 24px 18px;
+    margin: 12px;
+  }
+
+  /* Ayarlar Modalı */
+  .settings-card {
+    width: 95vw;
+    max-height: 88vh;
+  }
+
+  /* Kişi başı ses çubuğu */
+  .user-volume-box {
+    padding: 4px 6px;
+    gap: 4px;
+    font-size: 0.7rem;
+  }
+}
+
+/* Tablet ara boyutlar (769px - 1024px) */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .room-body {
+    grid-template-columns: 1fr 320px;
+  }
+
+  .topbar-actions .action-btn span:not(.btn-icon) {
+    display: none;
+  }
+
+  .topbar-actions .action-btn {
+    padding: 8px 12px;
   }
 }
 
