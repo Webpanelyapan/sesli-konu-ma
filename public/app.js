@@ -106,31 +106,29 @@ const roomUsers = new Map();
 // Kullanıcı başına ses seviyeleri: userId -> volume (0.0 to 2.0)
 const userVolumeSettings = new Map();
 
-// STUN + Global TURN Röle Sunucu Havuzu
+// STUN + Global TURN Röle Sunucu Havuzu (Gelişmiş Çoklu Bölge Altyapısı)
 const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
     { urls: 'stun:stun2.l.google.com:19302' },
     { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'stun:stun.services.mozilla.com' },
     {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
       username: 'openrelayproject',
       credential: 'openrelayproject'
     }
   ],
-  iceCandidatePoolSize: 10
+  iceCandidatePoolSize: 10,
+  bundlePolicy: 'max-bundle',
+  rtcpMuxPolicy: 'require'
 };
 
 // Web Audio API
@@ -280,9 +278,11 @@ function playSound(type = 'message') {
 async function initLocalMicrophone(deviceId = null) {
   try {
     const audioConstraints = {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: false
+      echoCancellation: { ideal: true },
+      noiseSuppression: { ideal: true },
+      autoGainControl: { ideal: true },
+      channelCount: { ideal: 1 },
+      sampleRate: { ideal: 48000 }
     };
     if (deviceId) {
       audioConstraints.deviceId = { exact: deviceId };
@@ -911,13 +911,19 @@ function createPeerConnection(targetUserId) {
   };
 
   pc.oniceconnectionstatechange = () => {
-    if (pc.iceConnectionState === 'failed') {
-      if (pc.restartIce) pc.restartIce();
+    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+      if (pc.restartIce) {
+        try { pc.restartIce(); } catch (e) {}
+      }
     }
   };
 
   pc.onconnectionstatechange = () => {
-    if (pc.connectionState === 'disconnected' || pc.connectionState === 'closed') {
+    if (pc.connectionState === 'failed') {
+      if (pc.restartIce) {
+        try { pc.restartIce(); } catch (e) {}
+      }
+    } else if (pc.connectionState === 'closed') {
       cleanupPeer(targetUserId);
     }
   };

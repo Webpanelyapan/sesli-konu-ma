@@ -10,10 +10,18 @@ const io = new Server(server, {
     origin: "*",
     methods: ["GET", "POST"]
   },
+  pingTimeout: 20000,
+  pingInterval: 10000,
+  transports: ['websocket', 'polling'],
   maxHttpBufferSize: 5e6 // 5MB dosya/resim transfer desteği
 });
 
 const PORT = process.env.PORT || 3000;
+
+// Sunucu sağlığı ve Keep-Alive endpoint'i
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', uptime: process.uptime(), roomsCount: rooms.size });
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
