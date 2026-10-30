@@ -101,48 +101,80 @@ body {
 
 .join-card {
   width: 100%;
-  max-width: 460px;
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--bg-card-border);
-  border-radius: var(--radius-lg);
-  padding: 36px;
-  box-shadow: var(--shadow-lg);
+  max-width: 480px;
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 24px;
+  padding: 38px 32px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 40px rgba(99, 102, 241, 0.1);
+  position: relative;
+  overflow: hidden;
+}
+
+.join-card::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%);
+  pointer-events: none;
 }
 
 .join-header {
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 26px;
+  position: relative;
+  z-index: 1;
 }
 
 .brand-icon {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 16px;
-  background: linear-gradient(135deg, var(--primary), #a855f7);
-  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 10px 24px rgba(99, 102, 241, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.3s ease;
+}
+
+.brand-icon:hover {
+  transform: scale(1.06) rotate(3deg);
 }
 
 .brand-icon svg {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   color: white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
-.join-header h1 {
-  font-size: 1.75rem;
+.brand-title {
+  font-size: 2.2rem;
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.03em;
   margin-bottom: 6px;
+  line-height: 1.1;
+}
+
+.brand-gradient {
+  background: linear-gradient(135deg, #ffffff 20%, #a5b4fc 60%, #e879f9 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
 }
 
 .subtitle {
   color: var(--text-secondary);
   font-size: 0.92rem;
+  font-weight: 500;
 }
 
 .join-form {
@@ -256,23 +288,25 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  background: linear-gradient(135deg, var(--primary), #4f46e5);
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%);
   color: white;
   border: none;
   border-radius: var(--radius-md);
-  padding: 14px 20px;
-  font-size: 1rem;
+  padding: 15px 22px;
+  font-size: 1.02rem;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-  transition: var(--transition);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
-  margin-top: 6px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.55), 0 0 15px rgba(217, 70, 239, 0.3);
 }
 
 .btn-primary:active {
@@ -286,7 +320,33 @@ body {
 }
 
 .btn-primary:hover .arrow-icon {
-  transform: translateX(3px);
+  transform: translateX(4px);
+}
+
+/* Giriş ekranı özellik etiketleri */
+.join-features-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  position: relative;
+  z-index: 1;
+}
+
+.feat-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ODA EKRANI */
@@ -304,10 +364,13 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 12px 24px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--bg-card-border);
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   height: 64px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  z-index: 20;
 }
 
 .room-identity {
